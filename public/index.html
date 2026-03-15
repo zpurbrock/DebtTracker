@@ -9,295 +9,160 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #0f0f0f;
-      --surface: #1a1a1a;
-      --surface2: #242424;
-      --border: rgba(255,255,255,0.08);
-      --border2: rgba(255,255,255,0.14);
-      --text: #f0f0f0;
-      --text2: #888;
-      --text3: #555;
-      --accent: #e8f55a;
-      --accent-dim: rgba(232,245,90,0.12);
-      --danger: #ff5c5c;
-      --success: #5cffa0;
-      --warning: #ffb347;
-      --radius: 12px;
-      --radius-sm: 8px;
+      --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #242424;
+      --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+      --text: #f0f0f0; --text2: #888; --text3: #555;
+      --accent: #e8f55a; --accent-dim: rgba(232,245,90,0.12);
+      --danger: #ff5c5c; --success: #5cffa0; --warning: #ffb347;
+      --radius: 12px; --radius-sm: 8px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { font-size: 16px; }
-    body {
-      font-family: 'DM Sans', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      line-height: 1.5;
-    }
-
-    /* ── Layout ── */
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
     .app { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
 
-    /* ── Topbar ── */
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .topbar-left h1 {
-      font-size: 22px;
-      font-weight: 600;
-      letter-spacing: -0.5px;
-    }
-    .topbar-left h1 span { color: var(--accent); }
-    .topbar-left p { font-size: 13px; color: var(--text2); margin-top: 2px; }
-    .topbar-right { display: flex; gap: 8px; }
+    /* Alert bar */
+    .alert-bar { display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:10px 16px; margin-bottom:1.5rem; align-items:center; gap:16px; flex-wrap:wrap; }
+    .alert-bar.visible { display:flex; }
+    .alert-item { display:flex; align-items:center; gap:6px; font-size:13px; }
+    .alert-item.overdue { color:var(--danger); }
+    .alert-item.upcoming { color:var(--warning); }
+    .alert-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .alert-dot.overdue { background:var(--danger); }
+    .alert-dot.upcoming { background:var(--warning); }
+    .alert-link { margin-left:auto; font-size:12px; color:var(--text2); cursor:pointer; text-decoration:underline; }
+    .alert-link:hover { color:var(--text); }
 
-    /* ── Buttons ── */
-    .btn {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 13px;
-      font-weight: 500;
-      padding: 8px 16px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border2);
-      background: var(--surface2);
-      color: var(--text);
-      cursor: pointer;
-      transition: all 0.15s;
-      white-space: nowrap;
-    }
-    .btn:hover { background: var(--surface); border-color: var(--border2); }
-    .btn.primary {
-      background: var(--accent);
-      color: #0f0f0f;
-      border-color: var(--accent);
-      font-weight: 600;
-    }
-    .btn.primary:hover { opacity: 0.88; }
-    .btn.danger { color: var(--danger); border-color: rgba(255,92,92,0.3); background: rgba(255,92,92,0.08); }
-    .btn.icon { padding: 6px 10px; font-size: 15px; }
+    /* Topbar */
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; flex-wrap:wrap; gap:12px; }
+    .topbar-left h1 { font-size:22px; font-weight:600; letter-spacing:-0.5px; }
+    .topbar-left h1 span { color:var(--accent); }
+    .topbar-left p { font-size:13px; color:var(--text2); margin-top:2px; }
+    .topbar-right { display:flex; gap:8px; flex-wrap:wrap; }
 
-    /* ── Metrics ── */
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 2rem;
-    }
-    .metric {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.1rem 1.25rem;
-    }
-    .metric .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
-    .metric .value { font-size: 24px; font-weight: 600; font-family: 'DM Mono', monospace; letter-spacing: -1px; }
-    .metric .value.danger { color: var(--danger); }
-    .metric .value.success { color: var(--success); }
-    .metric .sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
-    .progress-bar { height: 4px; background: var(--border); border-radius: 99px; margin-top: 10px; overflow: hidden; }
-    .progress-fill { height: 4px; background: var(--accent); border-radius: 99px; transition: width 0.5s ease; }
+    /* Buttons */
+    .btn { font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; padding:8px 16px; border-radius:var(--radius-sm); border:1px solid var(--border2); background:var(--surface2); color:var(--text); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+    .btn:hover { background:var(--surface); }
+    .btn.primary { background:var(--accent); color:#0f0f0f; border-color:var(--accent); font-weight:600; }
+    .btn.primary:hover { opacity:0.88; }
+    .btn.danger { color:var(--danger); border-color:rgba(255,92,92,0.3); background:rgba(255,92,92,0.08); }
+    .btn.sm { padding:5px 11px; font-size:12px; }
+    .btn.icon { padding:6px 10px; font-size:15px; }
 
-    /* ── Section header ── */
-    .section-hdr {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .section-title {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text2);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
+    /* Metrics */
+    .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:2rem; }
+    .metric { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.1rem 1.25rem; }
+    .metric .label { font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px; }
+    .metric .value { font-size:24px; font-weight:600; font-family:'DM Mono',monospace; letter-spacing:-1px; }
+    .metric .value.danger { color:var(--danger); }
+    .metric .value.success { color:var(--success); }
+    .metric .value.warning { color:var(--warning); }
+    .metric .sub { font-size:12px; color:var(--text3); margin-top:4px; }
+    .progress-bar { height:4px; background:var(--border); border-radius:99px; margin-top:10px; overflow:hidden; }
+    .progress-fill { height:4px; background:var(--accent); border-radius:99px; transition:width 0.5s; }
 
-    /* ── Charts ── */
-    .charts-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 2rem;
-    }
-    .chart-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.1rem;
-    }
-    .chart-card.full { grid-column: 1 / -1; }
-    .chart-card .chart-title { font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 14px; }
-    .chart-wrap { position: relative; height: 200px; }
-    .chart-wrap.tall { height: 220px; }
+    /* Section header */
+    .section-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .section-title { font-size:11px; font-weight:600; color:var(--text2); text-transform:uppercase; letter-spacing:0.08em; }
 
-    /* ── Debt cards ── */
-    .cards-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 12px;
-      margin-bottom: 2rem;
-    }
-    .debt-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.1rem;
-      position: relative;
-      transition: border-color 0.15s;
-    }
-    .debt-card:hover { border-color: var(--border2); }
-    .debt-card .name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
-    .debt-card .debtor { font-size: 12px; color: var(--text2); margin-bottom: 10px; }
-    .debt-card .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
-    .debt-card .row span { color: var(--text); font-weight: 500; font-family: 'DM Mono', monospace; font-size: 12px; }
-    .mini-bar { height: 4px; background: var(--surface2); border-radius: 99px; margin: 10px 0 8px; overflow: hidden; }
-    .mini-fill { height: 4px; border-radius: 99px; transition: width 0.4s; }
-    .pill {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 500;
-      padding: 2px 9px;
-      border-radius: 99px;
-      letter-spacing: 0.02em;
-    }
-    .del-btn {
-      position: absolute;
-      top: 10px; right: 10px;
-      background: none; border: none;
-      color: var(--text3); font-size: 14px;
-      cursor: pointer; line-height: 1;
-      transition: color 0.15s;
-    }
-    .del-btn:hover { color: var(--danger); }
-    .add-card {
-      border: 1px dashed var(--border2);
-      border-radius: var(--radius);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      min-height: 160px;
-      background: none;
-      color: var(--text3);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .add-card:hover { background: var(--surface); color: var(--text2); border-color: var(--text3); }
-    .add-card .plus { font-size: 24px; line-height: 1; }
+    /* Charts */
+    .charts-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:2rem; }
+    .chart-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.1rem; }
+    .chart-card.full { grid-column:1/-1; }
+    .chart-card .chart-title { font-size:13px; font-weight:500; color:var(--text2); margin-bottom:14px; }
+    .chart-wrap { position:relative; height:200px; }
+    .chart-wrap.tall { height:220px; }
 
-    /* ── Filters ── */
-    .filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-    .filter-pill {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 12px;
-      padding: 4px 12px;
-      border-radius: 99px;
-      border: 1px solid var(--border);
-      background: none;
-      color: var(--text2);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .filter-pill:hover { border-color: var(--border2); color: var(--text); }
-    .filter-pill.active { background: var(--accent); color: #0f0f0f; border-color: var(--accent); font-weight: 600; }
+    /* Debtor groups */
+    .debtors-list { margin-bottom:2rem; }
+    .debtor-group { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px; overflow:hidden; }
+    .debtor-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; transition:background 0.15s; }
+    .debtor-header:hover { background:var(--surface2); }
+    .debtor-name { font-size:15px; font-weight:600; }
+    .debtor-meta { font-size:12px; color:var(--text2); margin-top:2px; }
+    .debtor-actions { display:flex; gap:8px; align-items:center; }
+    .debtor-body { padding:0 16px 16px; }
+    .debtor-debts { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; margin-top:12px; }
 
-    /* ── Table ── */
-    .table-wrap {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow-x: auto;
-      margin-bottom: 2rem;
-    }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 500px; }
-    thead { background: var(--surface2); }
-    th {
-      padding: 11px 14px;
-      text-align: left;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text2);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      white-space: nowrap;
-    }
-    td {
-      padding: 11px 14px;
-      border-top: 1px solid var(--border);
-      color: var(--text);
-      white-space: nowrap;
-    }
-    td.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
-    tr:hover td { background: var(--surface2); }
-    .badge {
-      font-size: 11px;
-      font-weight: 500;
-      padding: 3px 9px;
-      border-radius: 99px;
-    }
-    .badge.paid { background: rgba(92,255,160,0.12); color: var(--success); }
-    .badge.pending { background: rgba(255,179,71,0.12); color: var(--warning); }
-    .empty-row td { text-align: center; color: var(--text3); padding: 2rem; }
+    /* Debt cards */
+    .debt-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:1rem; position:relative; transition:border-color 0.15s; }
+    .debt-card:hover { border-color:var(--border2); }
+    .dc-name { font-size:14px; font-weight:600; margin-bottom:6px; padding-right:20px; }
+    .dc-cats { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; }
+    .dc-row { display:flex; justify-content:space-between; font-size:12px; color:var(--text2); margin-bottom:3px; }
+    .dc-row span { color:var(--text); font-weight:500; font-family:'DM Mono',monospace; font-size:12px; }
+    .mini-bar { height:3px; background:var(--border); border-radius:99px; margin:8px 0 8px; overflow:hidden; }
+    .mini-fill { height:3px; border-radius:99px; transition:width 0.4s; }
+    .dc-pills { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px; }
+    .dc-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .del-btn { position:absolute; top:8px; right:8px; background:none; border:none; color:var(--text3); font-size:13px; cursor:pointer; line-height:1; transition:color 0.15s; }
+    .del-btn:hover { color:var(--danger); }
+    .add-debt-card { border:1px dashed var(--border2); border-radius:var(--radius-sm); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-height:120px; background:none; color:var(--text3); font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all 0.15s; width:100%; }
+    .add-debt-card:hover { background:var(--surface); color:var(--text2); }
 
-    /* ── Modal ── */
-    .modal-bg {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.65);
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-    .modal-bg.open { display: flex; }
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border2);
-      border-radius: var(--radius);
-      padding: 1.5rem;
-      width: 100%;
-      max-width: 380px;
-    }
-    .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 1.25rem; }
-    .field { margin-bottom: 14px; }
-    .field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; }
-    .field input, .field select {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border2);
-      border-radius: var(--radius-sm);
-      color: var(--text);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
-      padding: 9px 12px;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    .field input:focus, .field select:focus { border-color: var(--accent); }
-    .field select option { background: var(--surface2); }
-    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
+    /* Pills & tags */
+    .pill { display:inline-block; font-size:11px; font-weight:500; padding:2px 9px; border-radius:99px; letter-spacing:0.02em; }
+    .tag { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:500; padding:2px 8px; border-radius:99px; background:var(--accent-dim); color:var(--accent); border:none; }
+    .tag-remove { cursor:pointer; font-size:10px; color:rgba(232,245,90,0.5); line-height:1; background:none; border:none; padding:0; }
+    .tag-remove:hover { color:var(--danger); }
 
-    /* ── Mobile ── */
-    @media (max-width: 640px) {
-      .metrics { grid-template-columns: 1fr 1fr; }
-      .metrics .metric:last-child { grid-column: 1 / -1; }
-      .charts-grid { grid-template-columns: 1fr; }
-      .chart-card.full { grid-column: 1; }
-      .topbar-left h1 { font-size: 18px; }
-      .metric .value { font-size: 20px; }
+    /* Tag input */
+    .tag-input-wrap { display:flex; flex-wrap:wrap; gap:4px; background:var(--surface2); border:1px solid var(--border2); border-radius:var(--radius-sm); padding:6px 10px; min-height:42px; align-items:center; transition:border-color 0.15s; cursor:text; }
+    .tag-input-wrap:focus-within { border-color:var(--accent); }
+    .tag-input-wrap input { background:none; border:none; outline:none; color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; flex:1; min-width:80px; padding:1px 0; }
+
+    /* Filters */
+    .filters { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+    .filter-pill { font-family:'DM Sans',sans-serif; font-size:12px; padding:4px 12px; border-radius:99px; border:1px solid var(--border); background:none; color:var(--text2); cursor:pointer; transition:all 0.15s; }
+    .filter-pill:hover { border-color:var(--border2); color:var(--text); }
+    .filter-pill.active { background:var(--accent); color:#0f0f0f; border-color:var(--accent); font-weight:600; }
+
+    /* Table */
+    .table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow-x:auto; margin-bottom:2rem; }
+    table { width:100%; border-collapse:collapse; font-size:13px; min-width:500px; }
+    thead { background:var(--surface2); }
+    th { padding:11px 14px; text-align:left; font-size:11px; font-weight:600; color:var(--text2); text-transform:uppercase; letter-spacing:0.06em; white-space:nowrap; }
+    td { padding:11px 14px; border-top:1px solid var(--border); color:var(--text); white-space:nowrap; }
+    td.mono { font-family:'DM Mono',monospace; font-size:12px; }
+    tr:hover td { background:var(--surface2); }
+    tr.row-overdue td { background:rgba(255,92,92,0.04); }
+    tr.row-overdue:hover td { background:rgba(255,92,92,0.08); }
+    tr.row-upcoming td { background:rgba(255,179,71,0.04); }
+    tr.row-upcoming:hover td { background:rgba(255,179,71,0.08); }
+    .badge { font-size:11px; font-weight:500; padding:3px 9px; border-radius:99px; }
+    .badge.paid { background:rgba(92,255,160,0.12); color:var(--success); }
+    .badge.pending { background:rgba(255,179,71,0.12); color:var(--warning); }
+    .badge.overdue { background:rgba(255,92,92,0.12); color:var(--danger); }
+    .badge.upcoming { background:rgba(255,179,71,0.12); color:var(--warning); }
+    .empty-row td { text-align:center; color:var(--text3); padding:2rem; }
+
+    /* Modal */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:200; align-items:center; justify-content:center; padding:1rem; }
+    .modal-bg.open { display:flex; }
+    .modal { background:var(--surface); border:1px solid var(--border2); border-radius:var(--radius); padding:1.5rem; width:100%; max-width:420px; max-height:90vh; overflow-y:auto; }
+    .modal h2 { font-size:16px; font-weight:600; margin-bottom:1.25rem; }
+    .field { margin-bottom:14px; }
+    .field label { display:block; font-size:12px; color:var(--text2); margin-bottom:5px; }
+    .field input, .field select { width:100%; background:var(--surface2); border:1px solid var(--border2); border-radius:var(--radius-sm); color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; padding:9px 12px; outline:none; transition:border-color 0.15s; }
+    .field input:focus, .field select:focus { border-color:var(--accent); }
+    .field select option { background:var(--surface2); }
+    .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:1.25rem; }
+    .error-msg { font-size:12px; color:var(--danger); margin-top:4px; display:none; }
+    .error-msg.visible { display:block; }
+    .radio-group { display:flex; gap:6px; flex-wrap:wrap; }
+    .radio-opt { flex:1; min-width:80px; display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border2); border-radius:var(--radius-sm); padding:8px 10px; cursor:pointer; font-size:13px; transition:all 0.15s; }
+    .radio-opt input[type=radio] { accent-color:var(--accent); }
+    .radio-opt.selected { border-color:var(--accent); background:var(--accent-dim); }
+    .hint { font-size:11px; color:var(--text3); }
+
+    /* Responsive */
+    @media (max-width:768px) {
+      .metrics { grid-template-columns:repeat(2,1fr); }
+      .charts-grid { grid-template-columns:1fr; }
+      .chart-card.full { grid-column:1; }
     }
-    @media (max-width: 400px) {
-      .metrics { grid-template-columns: 1fr; }
-      .metrics .metric:last-child { grid-column: 1; }
+    @media (max-width:480px) {
+      .topbar-left h1 { font-size:18px; }
+      .metric .value { font-size:20px; }
     }
   </style>
 </head>
@@ -310,9 +175,24 @@
       <p id="current-date"></p>
     </div>
     <div class="topbar-right">
-      <button class="btn" onclick="openModal('modal-cat')">+ Categoría</button>
+      <button class="btn" onclick="openAddDebtorModal()">+ Deudor</button>
+      <button class="btn" onclick="openAddDebtModal()">+ Deuda</button>
+      <button class="btn" onclick="openAddInstallmentModal()">+ Plan de pago</button>
       <button class="btn primary" onclick="openPaymentModal()">+ Pago</button>
     </div>
+  </div>
+
+  <!-- Alert bar -->
+  <div class="alert-bar" id="alert-bar">
+    <div class="alert-item overdue" id="alert-overdue" style="display:none">
+      <span class="alert-dot overdue"></span>
+      <span id="alert-overdue-text"></span>
+    </div>
+    <div class="alert-item upcoming" id="alert-upcoming" style="display:none">
+      <span class="alert-dot upcoming"></span>
+      <span id="alert-upcoming-text"></span>
+    </div>
+    <span class="alert-link" onclick="document.getElementById('section-plan').scrollIntoView({behavior:'smooth'})">Ver plan de pagos →</span>
   </div>
 
   <!-- Metrics -->
@@ -320,7 +200,7 @@
     <div class="metric">
       <div class="label">Deuda total</div>
       <div class="value danger" id="m-total">$0</div>
-      <div class="sub" id="m-cats">0 categorías</div>
+      <div class="sub" id="m-debts-count">0 deudas</div>
     </div>
     <div class="metric">
       <div class="label">Total pagado</div>
@@ -331,7 +211,12 @@
     <div class="metric">
       <div class="label">Saldo pendiente</div>
       <div class="value" id="m-balance">$0</div>
-      <div class="sub" id="m-debtors">0 deudores</div>
+      <div class="sub" id="m-debtors-count">0 deudores</div>
+    </div>
+    <div class="metric">
+      <div class="label">Cuotas pendientes</div>
+      <div class="value warning" id="m-pending-inst">0</div>
+      <div class="sub" id="m-overdue-inst">0 vencidas</div>
     </div>
   </div>
 
@@ -339,7 +224,7 @@
   <div class="section-hdr"><span class="section-title">Gráficas</span></div>
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title">Saldo vs pagado por categoría</div>
+      <div class="chart-title">Saldo vs pagado por deuda</div>
       <div class="chart-wrap"><canvas id="chart-bar"></canvas></div>
     </div>
     <div class="chart-card">
@@ -355,30 +240,47 @@
       <div class="chart-wrap"><canvas id="chart-debtor"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">% avance por categoría</div>
+      <div class="chart-title">% avance por deuda</div>
       <div class="chart-wrap"><canvas id="chart-progress"></canvas></div>
     </div>
   </div>
 
-  <!-- Category cards -->
-  <div class="section-hdr"><span class="section-title">Categorías y deudores</span></div>
-  <div class="cards-grid" id="cards-grid"></div>
-
-  <!-- Payments table -->
+  <!-- Deudores & Deudas -->
   <div class="section-hdr">
-    <span class="section-title">Historial de pagos</span>
+    <span class="section-title">Deudores y deudas</span>
+    <button class="btn sm" onclick="openAddDebtorModal()">+ Deudor</button>
   </div>
-  <div class="filters" id="filters"></div>
+  <div class="debtors-list" id="debtors-list"></div>
+
+  <!-- Plan de pagos -->
+  <div class="section-hdr" id="section-plan">
+    <span class="section-title">Plan de pagos</span>
+    <button class="btn sm" onclick="openAddInstallmentModal()">+ Cuotas</button>
+  </div>
+  <div class="filters" id="plan-filters"></div>
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Mes / Año</th>
-          <th>Deudor</th>
-          <th>Categoría</th>
-          <th>Monto</th>
-          <th>Estado</th>
-          <th></th>
+          <th>Vencimiento</th><th>Deudor</th><th>Deuda</th>
+          <th>Descripción</th><th>Monto</th><th>Estado</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="plan-body"></tbody>
+    </table>
+  </div>
+
+  <!-- Historial -->
+  <div class="section-hdr">
+    <span class="section-title">Historial de pagos</span>
+  </div>
+  <div class="filters" id="pay-filters"></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th><th>Deudor</th><th>Deuda</th>
+          <th>Monto</th><th>Tipo de pago</th><th>Cuota</th><th></th>
         </tr>
       </thead>
       <tbody id="payments-body"></tbody>
@@ -387,16 +289,48 @@
 
 </div>
 
-<!-- Modal: Nueva categoría -->
-<div id="modal-cat" class="modal-bg">
+<!-- Modal: Nuevo deudor -->
+<div id="modal-debtor" class="modal-bg">
   <div class="modal">
-    <h2>Nueva categoría</h2>
-    <div class="field"><label>Nombre</label><input type="text" id="cat-name" placeholder="Ej: Hipoteca" /></div>
-    <div class="field"><label>Deudor</label><input type="text" id="cat-debtor" placeholder="Ej: Juan Pérez" /></div>
-    <div class="field"><label>Monto total de la deuda</label><input type="number" id="cat-total" placeholder="0" min="0" /></div>
+    <h2>Nuevo deudor</h2>
+    <div class="field">
+      <label>Nombre completo</label>
+      <input type="text" id="debtor-name" placeholder="Ej: Juan Pérez" />
+      <div class="error-msg" id="debtor-err">Ya existe un deudor con ese nombre.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-debtor')">Cancelar</button>
+      <button class="btn primary" onclick="addDebtor()">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nueva deuda -->
+<div id="modal-debt" class="modal-bg">
+  <div class="modal">
+    <h2>Nueva deuda</h2>
+    <div class="field">
+      <label>Deudor</label>
+      <select id="debt-debtor"></select>
+    </div>
+    <div class="field">
+      <label>Nombre de la deuda</label>
+      <input type="text" id="debt-name" placeholder="Ej: Préstamo coche" />
+    </div>
+    <div class="field">
+      <label>Monto total</label>
+      <input type="number" id="debt-total" placeholder="0" min="0" step="0.01" />
+    </div>
+    <div class="field">
+      <label>Categorías <span class="hint">(escribe y presiona Enter o coma)</span></label>
+      <div class="tag-input-wrap" id="debt-cats-wrap" onclick="document.getElementById('debt-cats-input').focus()">
+        <input type="text" id="debt-cats-input" placeholder="Ej: Personal" />
+      </div>
+      <input type="hidden" id="debt-cats-data" value="[]" />
+    </div>
     <div class="field">
       <label>Color</label>
-      <select id="cat-color">
+      <select id="debt-color">
         <option value="yellow">Amarillo</option>
         <option value="blue">Azul</option>
         <option value="pink">Rosa</option>
@@ -406,361 +340,613 @@
       </select>
     </div>
     <div class="modal-actions">
-      <button class="btn" onclick="closeModal('modal-cat')">Cancelar</button>
-      <button class="btn primary" onclick="addCategory()">Agregar</button>
+      <button class="btn" onclick="closeModal('modal-debt')">Cancelar</button>
+      <button class="btn primary" onclick="addDebt()">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Plan de pagos / Cuotas -->
+<div id="modal-installment" class="modal-bg">
+  <div class="modal">
+    <h2>Agregar cuotas</h2>
+    <div class="field">
+      <label>Deuda</label>
+      <select id="inst-debt"></select>
+    </div>
+    <div class="field">
+      <label>Tipo</label>
+      <div class="radio-group">
+        <label class="radio-opt selected" id="rl-single">
+          <input type="radio" name="inst-type" value="single" checked onchange="toggleInstType(this)"> Una cuota
+        </label>
+        <label class="radio-opt" id="rl-monthly">
+          <input type="radio" name="inst-type" value="monthly" onchange="toggleInstType(this)"> Plan mensual
+        </label>
+      </div>
+    </div>
+    <div id="inst-single-fields">
+      <div class="field"><label>Fecha de vencimiento</label><input type="date" id="inst-date" /></div>
+      <div class="field"><label>Monto</label><input type="number" id="inst-amount" placeholder="0" min="0" step="0.01" /></div>
+      <div class="field"><label>Descripción <span class="hint">(opcional)</span></label><input type="text" id="inst-desc" placeholder="Ej: Cuota enero" /></div>
+    </div>
+    <div id="inst-monthly-fields" style="display:none">
+      <div class="field"><label>Fecha del primer pago</label><input type="date" id="inst-start-date" /></div>
+      <div class="field"><label>Monto por cuota</label><input type="number" id="inst-monthly-amount" placeholder="0" min="0" step="0.01" /></div>
+      <div class="field"><label>Número de cuotas</label><input type="number" id="inst-num" placeholder="12" min="1" max="360" /></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-installment')">Cancelar</button>
+      <button class="btn primary" onclick="addInstallments()">Agregar</button>
     </div>
   </div>
 </div>
 
 <!-- Modal: Registrar pago -->
-<div id="modal-pay" class="modal-bg">
+<div id="modal-payment" class="modal-bg">
   <div class="modal">
     <h2>Registrar pago</h2>
-    <div class="field"><label>Categoría / Deudor</label><select id="pay-cat"></select></div>
-    <div class="field"><label>Monto</label><input type="number" id="pay-amount" placeholder="0" min="0" /></div>
     <div class="field">
-      <label>Mes</label>
-      <select id="pay-month">
-        <option>Enero</option><option>Febrero</option><option>Marzo</option><option>Abril</option>
-        <option>Mayo</option><option>Junio</option><option>Julio</option><option>Agosto</option>
-        <option>Septiembre</option><option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
-      </select>
+      <label>Deuda</label>
+      <select id="pay-debt" onchange="updatePayInstallments()"></select>
     </div>
-    <div class="field"><label>Año</label><input type="number" id="pay-year" value="2026" min="2020" max="2040" /></div>
     <div class="field">
-      <label>Estado</label>
-      <select id="pay-status">
-        <option value="paid">Pagado</option>
-        <option value="pending">Pendiente</option>
-      </select>
+      <label>Vincular a cuota <span class="hint">(opcional)</span></label>
+      <select id="pay-inst" onchange="prefillInstAmount()"><option value="">— Sin vincular —</option></select>
+    </div>
+    <div class="field"><label>Monto</label><input type="number" id="pay-amount" placeholder="0" min="0" step="0.01" /></div>
+    <div class="field"><label>Fecha</label><input type="date" id="pay-date" /></div>
+    <div class="field">
+      <label>Tipo de pago</label>
+      <div class="radio-group" id="pay-type-group">
+        <label class="radio-opt selected" id="rl-transfer"><input type="radio" name="pay-type" value="transfer" checked onchange="togglePayType(this)"> Transferencia</label>
+        <label class="radio-opt" id="rl-cash"><input type="radio" name="pay-type" value="cash" onchange="togglePayType(this)"> Efectivo</label>
+        <label class="radio-opt" id="rl-other"><input type="radio" name="pay-type" value="other" onchange="togglePayType(this)"> Otro</label>
+      </div>
+    </div>
+    <div class="field" id="pay-other-field" style="display:none">
+      <label>Especificar medio de pago</label>
+      <input type="text" id="pay-other-desc" placeholder="Ej: Cheque, depósito..." />
     </div>
     <div class="modal-actions">
-      <button class="btn" onclick="closeModal('modal-pay')">Cancelar</button>
+      <button class="btn" onclick="closeModal('modal-payment')">Cancelar</button>
       <button class="btn primary" onclick="addPayment()">Registrar</button>
     </div>
   </div>
 </div>
 
 <script>
-  // ── Paleta ──────────────────────────────────────────────
-  const PAL = {
-    yellow: { bar: '#e8f55a', light: 'rgba(232,245,90,0.25)', pill: 'background:rgba(232,245,90,0.15);color:#e8f55a' },
-    blue:   { bar: '#5ab4ff', light: 'rgba(90,180,255,0.25)', pill: 'background:rgba(90,180,255,0.15);color:#5ab4ff' },
-    pink:   { bar: '#ff7eb3', light: 'rgba(255,126,179,0.25)', pill: 'background:rgba(255,126,179,0.15);color:#ff7eb3' },
-    green:  { bar: '#5cffa0', light: 'rgba(92,255,160,0.25)', pill: 'background:rgba(92,255,160,0.15);color:#5cffa0' },
-    orange: { bar: '#ffb347', light: 'rgba(255,179,71,0.25)', pill: 'background:rgba(255,179,71,0.15);color:#ffb347' },
-    purple: { bar: '#b57bff', light: 'rgba(181,123,255,0.25)', pill: 'background:rgba(181,123,255,0.15);color:#b57bff' },
-  };
+const PAL = {
+  yellow: { bar:'#e8f55a', light:'rgba(232,245,90,0.25)', pill:'background:rgba(232,245,90,0.15);color:#e8f55a' },
+  blue:   { bar:'#5ab4ff', light:'rgba(90,180,255,0.25)', pill:'background:rgba(90,180,255,0.15);color:#5ab4ff' },
+  pink:   { bar:'#ff7eb3', light:'rgba(255,126,179,0.25)', pill:'background:rgba(255,126,179,0.15);color:#ff7eb3' },
+  green:  { bar:'#5cffa0', light:'rgba(92,255,160,0.25)', pill:'background:rgba(92,255,160,0.15);color:#5cffa0' },
+  orange: { bar:'#ffb347', light:'rgba(255,179,71,0.25)', pill:'background:rgba(255,179,71,0.15);color:#ffb347' },
+  purple: { bar:'#b57bff', light:'rgba(181,123,255,0.25)', pill:'background:rgba(181,123,255,0.15);color:#b57bff' },
+};
 
-  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+let debtors      = JSON.parse(localStorage.getItem('dt2-debtors')      || '[]');
+let debts        = JSON.parse(localStorage.getItem('dt2-debts')        || '[]');
+let installments = JSON.parse(localStorage.getItem('dt2-installments') || '[]');
+let payments     = JSON.parse(localStorage.getItem('dt2-payments')     || '[]');
+let nextId       = JSON.parse(localStorage.getItem('dt2-nextid')       || '1');
+let filterPlan   = 'all';
+let filterPay    = 'all';
+let charts       = {};
 
-  // ── Estado ──────────────────────────────────────────────
-  let categories = JSON.parse(localStorage.getItem('dt-cats') || 'null') || [
-    { id:1, name:'Transferencias (Esme)', debtor:'Esme', total:240000, color:'yellow' },
-    { id:2, name:'Coche', debtor:'Oscar', total:250000, color:'blue' },
-    { id:3, name:'Intereses', debtor:'Oscar', total:300000, color:'orange' },
-  ];
-  let payments = JSON.parse(localStorage.getItem('dt-pays') || 'null') || [
-    { id:1, catId:1, month:'Enero', year:2026, amount:10000, status:'paid' },
-    { id:2, catId:1, month:'Febrero', year:2026, amount:10000, status:'paid' },
-  ];
-  let filterDebtor = 'all';
-  let nextId = JSON.parse(localStorage.getItem('dt-nextid') || '10');
-  let charts = {};
+function save() {
+  localStorage.setItem('dt2-debtors',      JSON.stringify(debtors));
+  localStorage.setItem('dt2-debts',        JSON.stringify(debts));
+  localStorage.setItem('dt2-installments', JSON.stringify(installments));
+  localStorage.setItem('dt2-payments',     JSON.stringify(payments));
+  localStorage.setItem('dt2-nextid',       JSON.stringify(nextId));
+}
 
-  function save() {
-    localStorage.setItem('dt-cats', JSON.stringify(categories));
-    localStorage.setItem('dt-pays', JSON.stringify(payments));
-    localStorage.setItem('dt-nextid', JSON.stringify(nextId));
+const fmt  = n => '$' + Math.round(n).toLocaleString('es-MX');
+const col  = c => PAL[c] || PAL.yellow;
+const short = (s, n=16) => s.length > n ? s.slice(0, n) + '…' : s;
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const paidForDebt = id => payments.filter(p => p.debtId === id).reduce((s,p) => s + p.amount, 0);
+
+function instStatus(inst) {
+  if (inst.paid) return 'paid';
+  const t = todayStr();
+  if (inst.dueDate < t) return 'overdue';
+  const soon = new Date(); soon.setDate(soon.getDate() + 7);
+  if (inst.dueDate <= soon.toISOString().slice(0,10)) return 'upcoming';
+  return 'pending';
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+
+function payTypeName(type, otherDesc) {
+  if (type === 'transfer') return 'Transferencia';
+  if (type === 'cash') return 'Efectivo';
+  return otherDesc || 'Otro';
+}
+
+// ── Render ────────────────────────────────────────────────
+function render() {
+  const totalDebt  = debts.reduce((s,d) => s + d.total, 0);
+  const totalPaid  = payments.reduce((s,p) => s + p.amount, 0);
+  const balance    = totalDebt - totalPaid;
+  const pct        = totalDebt ? totalPaid / totalDebt * 100 : 0;
+  const pendInst   = installments.filter(i => !i.paid).length;
+  const overdueInst= installments.filter(i => instStatus(i) === 'overdue').length;
+
+  document.getElementById('m-total').textContent        = fmt(totalDebt);
+  document.getElementById('m-debts-count').textContent  = debts.length + ' deuda' + (debts.length !== 1 ? 's' : '');
+  document.getElementById('m-paid').textContent         = fmt(totalPaid);
+  document.getElementById('m-pct').textContent          = pct.toFixed(1) + '% del total';
+  document.getElementById('m-bar').style.width          = pct.toFixed(1) + '%';
+  document.getElementById('m-balance').textContent      = fmt(balance);
+  document.getElementById('m-debtors-count').textContent= debtors.length + ' deudor' + (debtors.length !== 1 ? 'es' : '');
+  document.getElementById('m-pending-inst').textContent = pendInst;
+  document.getElementById('m-overdue-inst').textContent = overdueInst + ' vencida' + (overdueInst !== 1 ? 's' : '');
+  document.getElementById('current-date').textContent   = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  renderAlerts();
+  renderDebtors();
+  renderPlanFilters();
+  renderPlan();
+  renderPayFilters();
+  renderPaymentsTable();
+  renderCharts();
+  save();
+}
+
+// ── Alerts ────────────────────────────────────────────────
+function renderAlerts() {
+  const overdue  = installments.filter(i => instStatus(i) === 'overdue');
+  const upcoming = installments.filter(i => instStatus(i) === 'upcoming');
+  const bar = document.getElementById('alert-bar');
+  const ovEl = document.getElementById('alert-overdue');
+  const upEl = document.getElementById('alert-upcoming');
+  ovEl.style.display = overdue.length  ? 'flex' : 'none';
+  upEl.style.display = upcoming.length ? 'flex' : 'none';
+  if (overdue.length)  document.getElementById('alert-overdue-text').textContent  = overdue.length  + ' pago' + (overdue.length  !== 1 ? 's' : '') + ' vencido'  + (overdue.length  !== 1 ? 's' : '');
+  if (upcoming.length) document.getElementById('alert-upcoming-text').textContent = upcoming.length + ' pago' + (upcoming.length !== 1 ? 's' : '') + ' por vencer (7 días)';
+  bar.classList.toggle('visible', overdue.length > 0 || upcoming.length > 0);
+}
+
+// ── Debtors ───────────────────────────────────────────────
+function renderDebtors() {
+  const list = document.getElementById('debtors-list');
+  if (!debtors.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text3);padding:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">Sin deudores. Agrega uno con "+ Deudor".</div>';
+    return;
   }
-
-  const fmt = n => '$' + Math.round(n).toLocaleString('es-MX');
-  const paidFor = id => payments.filter(p => p.catId === id).reduce((s, p) => s + p.amount, 0);
-  const col = c => PAL[c] || PAL.yellow;
-  const shortName = (s, n=15) => s.length > n ? s.slice(0, n) + '…' : s;
-
-  // ── Render ──────────────────────────────────────────────
-  function render() {
-    const totalDebt = categories.reduce((s, c) => s + c.total, 0);
-    const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
-    const balance = totalDebt - totalPaid;
-    const pct = totalDebt ? totalPaid / totalDebt * 100 : 0;
-    const debtors = [...new Set(categories.map(c => c.debtor))].length;
-
-    document.getElementById('m-total').textContent = fmt(totalDebt);
-    document.getElementById('m-cats').textContent = categories.length + ' categoría' + (categories.length !== 1 ? 's' : '');
-    document.getElementById('m-paid').textContent = fmt(totalPaid);
-    document.getElementById('m-pct').textContent = pct.toFixed(1) + '% del total';
-    document.getElementById('m-bar').style.width = pct.toFixed(1) + '%';
-    document.getElementById('m-balance').textContent = fmt(balance);
-    document.getElementById('m-debtors').textContent = debtors + ' deudor' + (debtors !== 1 ? 'es' : '');
-    document.getElementById('current-date').textContent = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
-
-    renderCards();
-    renderFilters();
-    renderPayments();
-    renderCharts();
-    save();
-  }
-
-  // ── Cards ────────────────────────────────────────────────
-  function renderCards() {
-    const grid = document.getElementById('cards-grid');
-    grid.innerHTML = '';
-    categories.forEach(c => {
-      const paid = paidFor(c.id);
-      const pct = c.total ? Math.min(100, paid / c.total * 100) : 0;
-      const p = col(c.color);
-      const div = document.createElement('div');
-      div.className = 'debt-card';
-      div.innerHTML = `
-        <button class="del-btn" onclick="deleteCategory(${c.id})">✕</button>
-        <div class="name">${c.name}</div>
-        <div class="debtor">Deudor: ${c.debtor}</div>
-        <div class="row">Total <span>${fmt(c.total)}</span></div>
-        <div class="row">Pagado <span>${fmt(paid)}</span></div>
-        <div class="row">Saldo <span>${fmt(c.total - paid)}</span></div>
+  list.innerHTML = debtors.map(debtor => {
+    const dDebts   = debts.filter(d => d.debtorId === debtor.id);
+    const totalD   = dDebts.reduce((s,d) => s + d.total, 0);
+    const paidD    = dDebts.reduce((s,d) => s + paidForDebt(d.id), 0);
+    const cards    = dDebts.map(d => {
+      const paid  = paidForDebt(d.id);
+      const pct   = d.total ? Math.min(100, paid / d.total * 100) : 0;
+      const p     = col(d.color);
+      const cats  = d.categories || [];
+      const pend  = installments.filter(i => i.debtId === d.id && !i.paid).length;
+      const over  = installments.filter(i => i.debtId === d.id && instStatus(i) === 'overdue').length;
+      return `<div class="debt-card">
+        <button class="del-btn" onclick="event.stopPropagation();deleteDebt(${d.id})">✕</button>
+        <div class="dc-name">${d.name}</div>
+        ${cats.length ? `<div class="dc-cats">${cats.map(c => `<span class="tag">${c}</span>`).join('')}</div>` : ''}
+        <div class="dc-row">Total <span>${fmt(d.total)}</span></div>
+        <div class="dc-row">Pagado <span>${fmt(paid)}</span></div>
+        <div class="dc-row">Saldo <span>${fmt(d.total - paid)}</span></div>
         <div class="mini-bar"><div class="mini-fill" style="width:${pct.toFixed(1)}%;background:${p.bar}"></div></div>
-        <span class="pill" style="${p.pill}">${pct.toFixed(1)}% pagado</span>`;
-      grid.appendChild(div);
-    });
-    const add = document.createElement('button');
-    add.className = 'add-card';
-    add.onclick = () => openModal('modal-cat');
-    add.innerHTML = '<span class="plus">+</span><span>Nueva categoría</span>';
-    grid.appendChild(add);
-  }
-
-  // ── Filters ──────────────────────────────────────────────
-  function renderFilters() {
-    const debtors = ['all', ...new Set(categories.map(c => c.debtor))];
-    const wrap = document.getElementById('filters');
-    wrap.innerHTML = '';
-    debtors.forEach(d => {
-      const btn = document.createElement('button');
-      btn.className = 'filter-pill' + (filterDebtor === d ? ' active' : '');
-      btn.textContent = d === 'all' ? 'Todos' : d;
-      btn.onclick = () => { filterDebtor = d; render(); };
-      wrap.appendChild(btn);
-    });
-  }
-
-  // ── Payments table ───────────────────────────────────────
-  function renderPayments() {
-    const tbody = document.getElementById('payments-body');
-    const rows = payments.filter(p => {
-      if (filterDebtor === 'all') return true;
-      const cat = categories.find(c => c.id === p.catId);
-      return cat && cat.debtor === filterDebtor;
-    });
-    if (!rows.length) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Sin pagos registrados</td></tr>';
-      return;
-    }
-    tbody.innerHTML = rows.map(p => {
-      const cat = categories.find(c => c.id === p.catId);
-      return `<tr>
-        <td>${p.month} ${p.year}</td>
-        <td>${cat ? cat.debtor : '—'}</td>
-        <td>${cat ? cat.name : '—'}</td>
-        <td class="mono">${fmt(p.amount)}</td>
-        <td><span class="badge ${p.status}">${p.status === 'paid' ? 'Pagado' : 'Pendiente'}</span></td>
-        <td><button class="btn icon danger" onclick="deletePayment(${p.id})">✕</button></td>
-      </tr>`;
+        <div class="dc-pills">
+          <span class="pill" style="${p.pill}">${pct.toFixed(1)}% pagado</span>
+          ${over  ? `<span class="pill" style="background:rgba(255,92,92,0.12);color:var(--danger)">${over} vencida${over !== 1 ? 's' : ''}</span>` : ''}
+          ${pend && !over ? `<span class="pill" style="background:rgba(255,179,71,0.12);color:var(--warning)">${pend} cuota${pend !== 1 ? 's' : ''} pend.</span>` : ''}
+        </div>
+        <div class="dc-actions">
+          <button class="btn sm" onclick="openAddInstallmentModal(${d.id})">+ Cuota</button>
+          <button class="btn sm primary" onclick="openPaymentModal(${d.id})">+ Pago</button>
+        </div>
+      </div>`;
     }).join('');
+
+    return `<div class="debtor-group">
+      <div class="debtor-header" onclick="toggleDebtor(${debtor.id})">
+        <div>
+          <div class="debtor-name">${debtor.name}</div>
+          <div class="debtor-meta">${dDebts.length} deuda${dDebts.length !== 1 ? 's' : ''} · Total: ${fmt(totalD)} · Pagado: ${fmt(paidD)}</div>
+        </div>
+        <div class="debtor-actions">
+          <button class="btn sm" onclick="event.stopPropagation();openAddDebtModal(${debtor.id})">+ Deuda</button>
+          <button class="btn sm danger" onclick="event.stopPropagation();deleteDebtor(${debtor.id})">Eliminar</button>
+          <span id="arrow-${debtor.id}" style="color:var(--text3);font-size:18px;transition:transform 0.2s">▾</span>
+        </div>
+      </div>
+      <div class="debtor-body" id="debtor-body-${debtor.id}">
+        <div class="debtor-debts">
+          ${cards}
+          <button class="add-debt-card" onclick="openAddDebtModal(${debtor.id})"><span style="font-size:20px">+</span><span>Nueva deuda</span></button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleDebtor(id) {
+  const body  = document.getElementById('debtor-body-' + id);
+  const arrow = document.getElementById('arrow-' + id);
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? '' : 'none';
+  arrow.style.transform = hidden ? '' : 'rotate(-90deg)';
+}
+
+// ── Plan ──────────────────────────────────────────────────
+function setFilterPlan(v) { filterPlan = v === 'all' ? 'all' : parseInt(v); render(); }
+function setFilterPay(v)  { filterPay  = v === 'all' ? 'all' : parseInt(v); render(); }
+
+function renderPlanFilters() {
+  document.getElementById('plan-filters').innerHTML =
+    [{ id:'all', name:'Todos' }, ...debtors].map(d =>
+      `<button class="filter-pill${filterPlan === d.id ? ' active' : ''}" onclick="setFilterPlan('${d.id}')">${d.name || 'Todos'}</button>`
+    ).join('');
+}
+
+function renderPlan() {
+  const tbody = document.getElementById('plan-body');
+  let rows = [...installments].sort((a,b) => a.dueDate.localeCompare(b.dueDate));
+  if (filterPlan !== 'all') {
+    const debtIds = debts.filter(d => d.debtorId === filterPlan).map(d => d.id);
+    rows = rows.filter(i => debtIds.includes(i.debtId));
   }
-
-  // ── Charts ───────────────────────────────────────────────
-  const axisOpts = () => ({
-    ticks: { color: '#555', font: { size: 11, family: 'DM Sans' } },
-    grid: { color: 'rgba(255,255,255,0.05)' }
-  });
-  const legendOpts = {
-    labels: { color: '#888', font: { size: 11, family: 'DM Sans' }, boxWidth: 10, padding: 12 }
-  };
-
-  function renderCharts() {
-    const labels = categories.map(c => shortName(c.name));
-    const barColors = categories.map(c => col(c.color).bar);
-    const lightColors = categories.map(c => col(c.color).light);
-    const paid = categories.map(c => paidFor(c.id));
-    const balances = categories.map((c, i) => Math.max(0, c.total - paid[i]));
-
-    // Bar: saldo vs pagado
-    if (charts.bar) charts.bar.destroy();
-    charts.bar = new Chart(document.getElementById('chart-bar'), {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Pagado', data: paid, backgroundColor: barColors, borderRadius: 4 },
-          { label: 'Saldo', data: balances, backgroundColor: lightColors, borderRadius: 4 },
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: legendOpts },
-        scales: {
-          x: axisOpts(),
-          y: { ...axisOpts(), ticks: { ...axisOpts().ticks, callback: v => '$' + Math.round(v / 1000) + 'k' } }
-        }
-      }
-    });
-
-    // Donut
-    if (charts.donut) charts.donut.destroy();
-    charts.donut = new Chart(document.getElementById('chart-donut'), {
-      type: 'doughnut',
-      data: {
-        labels: categories.map(c => shortName(c.name, 12)),
-        datasets: [{ data: categories.map(c => c.total), backgroundColor: barColors, borderWidth: 0, hoverOffset: 8 }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false, cutout: '62%',
-        plugins: { legend: legendOpts }
-      }
-    });
-
-    // Line: acumulado
-    const allKeys = [];
-    [...payments].sort((a, b) => {
-      return (a.year * 100 + MONTHS.indexOf(a.month)) - (b.year * 100 + MONTHS.indexOf(b.month));
-    }).forEach(p => {
-      const k = p.month + ' ' + p.year;
-      if (!allKeys.includes(k)) allKeys.push(k);
-    });
-    if (!allKeys.length) allKeys.push('—');
-
-    const lineDatasets = categories.map(c => {
-      let cum = 0;
-      const data = allKeys.map(k => {
-        const [mo, yr] = k.split(' ');
-        cum += payments.filter(p => p.catId === c.id && p.month === mo && p.year === parseInt(yr)).reduce((s, p) => s + p.amount, 0);
-        return cum;
-      });
-      const p = col(c.color);
-      return { label: shortName(c.name), data, borderColor: p.bar, backgroundColor: p.light, fill: true, tension: 0.35, pointRadius: 4, pointBackgroundColor: p.bar };
-    });
-
-    if (charts.line) charts.line.destroy();
-    charts.line = new Chart(document.getElementById('chart-line'), {
-      type: 'line',
-      data: { labels: allKeys, datasets: lineDatasets },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: legendOpts },
-        scales: {
-          x: axisOpts(),
-          y: { ...axisOpts(), ticks: { ...axisOpts().ticks, callback: v => '$' + Math.round(v / 1000) + 'k' } }
-        }
-      }
-    });
-
-    // Debtor bar
-    const debtors = [...new Set(categories.map(c => c.debtor))];
-    const dTotals = debtors.map(d => categories.filter(c => c.debtor === d).reduce((s, c) => s + c.total, 0));
-    const dPaid = debtors.map(d => {
-      const ids = categories.filter(c => c.debtor === d).map(c => c.id);
-      return payments.filter(p => ids.includes(p.catId)).reduce((s, p) => s + p.amount, 0);
-    });
-    const dColors = debtors.map((_, i) => Object.values(PAL)[i % Object.keys(PAL).length].bar);
-
-    if (charts.debtor) charts.debtor.destroy();
-    charts.debtor = new Chart(document.getElementById('chart-debtor'), {
-      type: 'bar',
-      data: {
-        labels: debtors,
-        datasets: [
-          { label: 'Deuda total', data: dTotals, backgroundColor: dColors.map(c => c + '44'), borderRadius: 4 },
-          { label: 'Pagado', data: dPaid, backgroundColor: dColors, borderRadius: 4 },
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: legendOpts },
-        scales: {
-          x: axisOpts(),
-          y: { ...axisOpts(), ticks: { ...axisOpts().ticks, callback: v => '$' + Math.round(v / 1000) + 'k' } }
-        }
-      }
-    });
-
-    // Progress horizontal
-    const pcts = categories.map(c => { const p = paidFor(c.id); return c.total ? Math.round(p / c.total * 100) : 0; });
-    if (charts.progress) charts.progress.destroy();
-    charts.progress = new Chart(document.getElementById('chart-progress'), {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{ label: '% pagado', data: pcts, backgroundColor: barColors, borderRadius: 4 }]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ...axisOpts(), min: 0, max: 100, ticks: { ...axisOpts().ticks, callback: v => v + '%' } },
-          y: axisOpts()
-        }
-      }
-    });
+  if (!rows.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Sin cuotas programadas</td></tr>';
+    return;
   }
+  const labels = { paid:'Pagado', pending:'Pendiente', overdue:'Vencido', upcoming:'Por vencer' };
+  tbody.innerHTML = rows.map(inst => {
+    const debt   = debts.find(d => d.id === inst.debtId);
+    const debtor = debt ? debtors.find(d => d.id === debt.debtorId) : null;
+    const st     = instStatus(inst);
+    return `<tr class="${st === 'overdue' ? 'row-overdue' : st === 'upcoming' ? 'row-upcoming' : ''}">
+      <td class="mono">${fmtDate(inst.dueDate)}</td>
+      <td>${debtor ? debtor.name : '—'}</td>
+      <td>${debt ? debt.name : '—'}</td>
+      <td style="color:var(--text2)">${inst.description || '—'}</td>
+      <td class="mono">${fmt(inst.amount)}</td>
+      <td><span class="badge ${st}">${labels[st]}</span></td>
+      <td style="display:flex;gap:4px">
+        ${!inst.paid ? `<button class="btn sm primary" onclick="openPaymentModal(${inst.debtId},${inst.id})">Pagar</button>` : ''}
+        <button class="btn sm danger" onclick="deleteInstallment(${inst.id})">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
 
-  // ── Modals ───────────────────────────────────────────────
-  function openModal(id) { document.getElementById(id).classList.add('open'); }
-  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+// ── Payments table ────────────────────────────────────────
+function renderPayFilters() {
+  document.getElementById('pay-filters').innerHTML =
+    [{ id:'all', name:'Todos' }, ...debtors].map(d =>
+      `<button class="filter-pill${filterPay === d.id ? ' active' : ''}" onclick="setFilterPay('${d.id}')">${d.name || 'Todos'}</button>`
+    ).join('');
+}
 
-  function openPaymentModal() {
-    document.getElementById('pay-cat').innerHTML = categories
-      .map(c => `<option value="${c.id}">${c.name} (${c.debtor})</option>`).join('');
-    openModal('modal-pay');
+function renderPaymentsTable() {
+  const tbody = document.getElementById('payments-body');
+  let rows = [...payments].sort((a,b) => b.date.localeCompare(a.date));
+  if (filterPay !== 'all') {
+    const debtIds = debts.filter(d => d.debtorId === filterPay).map(d => d.id);
+    rows = rows.filter(p => debtIds.includes(p.debtId));
   }
+  if (!rows.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Sin pagos registrados</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(p => {
+    const debt   = debts.find(d => d.id === p.debtId);
+    const debtor = debt ? debtors.find(d => d.id === debt.debtorId) : null;
+    const inst   = p.installmentId ? installments.find(i => i.id === p.installmentId) : null;
+    return `<tr>
+      <td class="mono">${fmtDate(p.date)}</td>
+      <td>${debtor ? debtor.name : '—'}</td>
+      <td>${debt ? debt.name : '—'}</td>
+      <td class="mono">${fmt(p.amount)}</td>
+      <td style="color:var(--text2);font-size:12px">${payTypeName(p.type, p.otherDesc)}</td>
+      <td style="color:var(--text2);font-size:12px">${inst ? fmtDate(inst.dueDate) + (inst.description ? ' · ' + inst.description : '') : '—'}</td>
+      <td><button class="btn icon danger" onclick="deletePayment(${p.id})">✕</button></td>
+    </tr>`;
+  }).join('');
+}
 
-  // Close modal on bg click
-  document.querySelectorAll('.modal-bg').forEach(el => {
-    el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+// ── Charts ────────────────────────────────────────────────
+const axisOpts = () => ({ ticks:{ color:'#555', font:{ size:11, family:'DM Sans' } }, grid:{ color:'rgba(255,255,255,0.05)' } });
+const legendOpts = { labels:{ color:'#888', font:{ size:11, family:'DM Sans' }, boxWidth:10, padding:12 } };
+
+function renderCharts() {
+  ['bar','donut','line','debtor','progress'].forEach(k => { if (charts[k]) { charts[k].destroy(); charts[k] = null; } });
+  if (!debts.length) return;
+
+  const labels     = debts.map(d => short(d.name));
+  const barColors  = debts.map(d => col(d.color).bar);
+  const lightColors= debts.map(d => col(d.color).light);
+  const paid       = debts.map(d => paidForDebt(d.id));
+  const balances   = debts.map((d,i) => Math.max(0, d.total - paid[i]));
+
+  charts.bar = new Chart(document.getElementById('chart-bar'), {
+    type:'bar', data:{ labels, datasets:[
+      { label:'Pagado', data:paid, backgroundColor:barColors, borderRadius:4 },
+      { label:'Saldo',  data:balances, backgroundColor:lightColors, borderRadius:4 }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:legendOpts },
+      scales:{ x:axisOpts(), y:{ ...axisOpts(), ticks:{ ...axisOpts().ticks, callback:v=>'$'+Math.round(v/1000)+'k' } } } }
   });
 
-  // ── CRUD ─────────────────────────────────────────────────
-  function addCategory() {
-    const name = document.getElementById('cat-name').value.trim();
-    const debtor = document.getElementById('cat-debtor').value.trim();
-    const total = parseFloat(document.getElementById('cat-total').value) || 0;
-    const color = document.getElementById('cat-color').value;
-    if (!name || !debtor) return;
-    categories.push({ id: nextId++, name, debtor, total, color });
-    closeModal('modal-cat');
-    ['cat-name', 'cat-debtor', 'cat-total'].forEach(id => document.getElementById(id).value = '');
-    render();
-  }
+  charts.donut = new Chart(document.getElementById('chart-donut'), {
+    type:'doughnut', data:{ labels:debts.map(d=>short(d.name,12)), datasets:[{ data:debts.map(d=>d.total), backgroundColor:barColors, borderWidth:0, hoverOffset:8 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{ legend:legendOpts } }
+  });
 
-  function addPayment() {
-    const catId = parseInt(document.getElementById('pay-cat').value);
-    const amount = parseFloat(document.getElementById('pay-amount').value) || 0;
-    const month = document.getElementById('pay-month').value;
-    const year = parseInt(document.getElementById('pay-year').value);
-    const status = document.getElementById('pay-status').value;
-    if (!catId || !amount) return;
-    payments.push({ id: nextId++, catId, month, year, amount, status });
-    closeModal('modal-pay');
-    document.getElementById('pay-amount').value = '';
-    render();
-  }
+  const sortedPays = [...payments].sort((a,b)=>a.date.localeCompare(b.date));
+  const allMonths  = [...new Set(sortedPays.map(p=>p.date.slice(0,7)))];
+  if (!allMonths.length) allMonths.push(todayStr().slice(0,7));
+  const lineDS = debts.map(d => {
+    let cum = 0;
+    const data = allMonths.map(ym => { cum += payments.filter(p=>p.debtId===d.id&&p.date.slice(0,7)===ym).reduce((s,p)=>s+p.amount,0); return cum; });
+    const p = col(d.color);
+    return { label:short(d.name), data, borderColor:p.bar, backgroundColor:p.light, fill:true, tension:0.35, pointRadius:4, pointBackgroundColor:p.bar };
+  });
+  charts.line = new Chart(document.getElementById('chart-line'), {
+    type:'line', data:{ labels:allMonths, datasets:lineDS },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:legendOpts },
+      scales:{ x:axisOpts(), y:{ ...axisOpts(), ticks:{ ...axisOpts().ticks, callback:v=>'$'+Math.round(v/1000)+'k' } } } }
+  });
 
-  function deleteCategory(id) {
-    if (!confirm('¿Eliminar esta categoría y sus pagos?')) return;
-    categories = categories.filter(c => c.id !== id);
-    payments = payments.filter(p => p.catId !== id);
-    render();
-  }
+  const dTotals = debtors.map(d => debts.filter(dt=>dt.debtorId===d.id).reduce((s,dt)=>s+dt.total,0));
+  const dPaid   = debtors.map(d => { const ids=debts.filter(dt=>dt.debtorId===d.id).map(dt=>dt.id); return payments.filter(p=>ids.includes(p.debtId)).reduce((s,p)=>s+p.amount,0); });
+  const dColors = debtors.map((_,i) => Object.values(PAL)[i % 6].bar);
+  charts.debtor = new Chart(document.getElementById('chart-debtor'), {
+    type:'bar', data:{ labels:debtors.map(d=>d.name), datasets:[
+      { label:'Deuda total', data:dTotals, backgroundColor:dColors.map(c=>c+'44'), borderRadius:4 },
+      { label:'Pagado', data:dPaid, backgroundColor:dColors, borderRadius:4 }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:legendOpts },
+      scales:{ x:axisOpts(), y:{ ...axisOpts(), ticks:{ ...axisOpts().ticks, callback:v=>'$'+Math.round(v/1000)+'k' } } } }
+  });
 
-  function deletePayment(id) {
-    payments = payments.filter(p => p.id !== id);
-    render();
-  }
+  const pcts = debts.map(d => { const p=paidForDebt(d.id); return d.total ? Math.round(p/d.total*100) : 0; });
+  charts.progress = new Chart(document.getElementById('chart-progress'), {
+    type:'bar', data:{ labels, datasets:[{ label:'% pagado', data:pcts, backgroundColor:barColors, borderRadius:4 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
+      scales:{ x:{ ...axisOpts(), min:0, max:100, ticks:{ ...axisOpts().ticks, callback:v=>v+'%' } }, y:axisOpts() } }
+  });
+}
 
-  // ── Init ─────────────────────────────────────────────────
+// ── Modals ────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(el => el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); }));
+document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-bg.open').forEach(m=>m.classList.remove('open')); });
+
+function openAddDebtorModal() {
+  document.getElementById('debtor-name').value = '';
+  document.getElementById('debtor-err').classList.remove('visible');
+  openModal('modal-debtor');
+  setTimeout(() => document.getElementById('debtor-name').focus(), 100);
+}
+
+function openAddDebtModal(preDebtorId) {
+  const sel = document.getElementById('debt-debtor');
+  sel.innerHTML = debtors.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  if (!debtors.length) { alert('Primero agrega un deudor.'); return; }
+  if (preDebtorId) sel.value = preDebtorId;
+  document.getElementById('debt-name').value = '';
+  document.getElementById('debt-total').value = '';
+  document.getElementById('debt-cats-data').value = '[]';
+  document.getElementById('debt-cats-wrap').querySelectorAll('.tag').forEach(t=>t.remove());
+  document.getElementById('debt-cats-input').value = '';
+  openModal('modal-debt');
+}
+
+function openAddInstallmentModal(preDebtId) {
+  if (!debts.length) { alert('Primero agrega una deuda.'); return; }
+  const sel = document.getElementById('inst-debt');
+  sel.innerHTML = debts.map(d => { const dr=debtors.find(x=>x.id===d.debtorId); return `<option value="${d.id}">${dr?dr.name+' · ':''}${d.name}</option>`; }).join('');
+  if (preDebtId) sel.value = preDebtId;
+  document.getElementById('inst-date').value = todayStr();
+  document.getElementById('inst-start-date').value = todayStr();
+  ['inst-amount','inst-monthly-amount','inst-num','inst-desc'].forEach(id => document.getElementById(id).value = '');
+  document.querySelector('input[name="inst-type"][value="single"]').checked = true;
+  document.getElementById('inst-single-fields').style.display = '';
+  document.getElementById('inst-monthly-fields').style.display = 'none';
+  document.getElementById('rl-single').classList.add('selected');
+  document.getElementById('rl-monthly').classList.remove('selected');
+  openModal('modal-installment');
+}
+
+function openPaymentModal(preDebtId, preInstId) {
+  if (!debts.length) { alert('Primero agrega una deuda.'); return; }
+  const sel = document.getElementById('pay-debt');
+  sel.innerHTML = debts.map(d => { const dr=debtors.find(x=>x.id===d.debtorId); return `<option value="${d.id}">${dr?dr.name+' · ':''}${d.name}</option>`; }).join('');
+  if (preDebtId) sel.value = preDebtId;
+  document.getElementById('pay-date').value = todayStr();
+  document.getElementById('pay-amount').value = '';
+  document.getElementById('pay-other-desc').value = '';
+  document.getElementById('pay-other-field').style.display = 'none';
+  document.querySelector('input[name="pay-type"][value="transfer"]').checked = true;
+  document.querySelectorAll('#pay-type-group .radio-opt').forEach(el=>el.classList.remove('selected'));
+  document.getElementById('rl-transfer').classList.add('selected');
+  updatePayInstallments(preInstId);
+  openModal('modal-payment');
+}
+
+function updatePayInstallments(preInstId) {
+  const debtId  = parseInt(document.getElementById('pay-debt').value);
+  const instSel = document.getElementById('pay-inst');
+  const pending = installments.filter(i => i.debtId===debtId && !i.paid).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  instSel.innerHTML = '<option value="">— Sin vincular —</option>' +
+    pending.map(i=>`<option value="${i.id}">${fmtDate(i.dueDate)}${i.description?' · '+i.description:''} (${fmt(i.amount)})</option>`).join('');
+  if (preInstId) {
+    instSel.value = String(preInstId);
+    prefillInstAmount();
+  }
+}
+
+function prefillInstAmount() {
+  const id = parseInt(document.getElementById('pay-inst').value);
+  if (!id) return;
+  const inst = installments.find(i=>i.id===id);
+  if (inst) document.getElementById('pay-amount').value = inst.amount;
+}
+
+function toggleInstType(radio) {
+  const single = radio.value === 'single';
+  document.getElementById('inst-single-fields').style.display = single ? '' : 'none';
+  document.getElementById('inst-monthly-fields').style.display = single ? 'none' : '';
+  document.getElementById('rl-single').classList.toggle('selected', single);
+  document.getElementById('rl-monthly').classList.toggle('selected', !single);
+}
+
+function togglePayType(radio) {
+  document.querySelectorAll('#pay-type-group .radio-opt').forEach(el=>el.classList.remove('selected'));
+  radio.closest('.radio-opt').classList.add('selected');
+  document.getElementById('pay-other-field').style.display = radio.value==='other' ? '' : 'none';
+}
+
+// ── Tag input ─────────────────────────────────────────────
+function addTag(value) {
+  const v = value.trim().replace(/,/g,'');
+  if (!v) return;
+  const dataInput = document.getElementById('debt-cats-data');
+  const cats = JSON.parse(dataInput.value || '[]');
+  if (cats.includes(v)) return;
+  cats.push(v);
+  dataInput.value = JSON.stringify(cats);
+  const wrap = document.getElementById('debt-cats-wrap');
+  const tag  = document.createElement('span');
+  tag.className = 'tag';
+  tag.innerHTML = `${v} <button class="tag-remove" onclick="removeTag(this,'${v.replace(/'/g,"\\'")}')">✕</button>`;
+  wrap.insertBefore(tag, document.getElementById('debt-cats-input'));
+}
+
+function removeTag(btn, value) {
+  const dataInput = document.getElementById('debt-cats-data');
+  let cats = JSON.parse(dataInput.value || '[]');
+  cats = cats.filter(c=>c!==value);
+  dataInput.value = JSON.stringify(cats);
+  btn.closest('.tag').remove();
+}
+
+document.getElementById('debt-cats-input').addEventListener('keydown', function(e) {
+  if (e.key==='Enter'||e.key===',') { e.preventDefault(); addTag(this.value); this.value=''; }
+});
+document.getElementById('debt-cats-input').addEventListener('blur', function() {
+  if (this.value.trim()) { addTag(this.value); this.value=''; }
+});
+
+// ── CRUD ──────────────────────────────────────────────────
+function addDebtor() {
+  const name = document.getElementById('debtor-name').value.trim();
+  if (!name) return;
+  const err = document.getElementById('debtor-err');
+  if (debtors.some(d=>d.name.toLowerCase()===name.toLowerCase())) { err.classList.add('visible'); return; }
+  err.classList.remove('visible');
+  debtors.push({ id:nextId++, name });
+  closeModal('modal-debtor');
   render();
+}
+
+function addDebt() {
+  const debtorId = parseInt(document.getElementById('debt-debtor').value);
+  const name     = document.getElementById('debt-name').value.trim();
+  const total    = parseFloat(document.getElementById('debt-total').value) || 0;
+  const categories = JSON.parse(document.getElementById('debt-cats-data').value || '[]');
+  const color    = document.getElementById('debt-color').value;
+  if (!debtorId || !name) return;
+  debts.push({ id:nextId++, debtorId, name, total, categories, color });
+  closeModal('modal-debt');
+  render();
+}
+
+function addInstallments() {
+  const debtId = parseInt(document.getElementById('inst-debt').value);
+  if (!debtId) return;
+  const type = document.querySelector('input[name="inst-type"]:checked').value;
+  if (type === 'single') {
+    const dueDate     = document.getElementById('inst-date').value;
+    const amount      = parseFloat(document.getElementById('inst-amount').value) || 0;
+    const description = document.getElementById('inst-desc').value.trim();
+    if (!dueDate || !amount) return;
+    installments.push({ id:nextId++, debtId, dueDate, amount, description, paid:false });
+  } else {
+    const startDate = document.getElementById('inst-start-date').value;
+    const amount    = parseFloat(document.getElementById('inst-monthly-amount').value) || 0;
+    const num       = parseInt(document.getElementById('inst-num').value) || 0;
+    if (!startDate || !amount || !num) return;
+    const base = new Date(startDate + 'T12:00:00');
+    for (let i=0; i<num; i++) {
+      const d = new Date(base);
+      d.setMonth(d.getMonth() + i);
+      installments.push({ id:nextId++, debtId, dueDate:d.toISOString().slice(0,10), amount, description:`Cuota ${i+1}`, paid:false });
+    }
+  }
+  closeModal('modal-installment');
+  render();
+}
+
+function addPayment() {
+  const debtId        = parseInt(document.getElementById('pay-debt').value);
+  const installmentId = parseInt(document.getElementById('pay-inst').value) || null;
+  const amount        = parseFloat(document.getElementById('pay-amount').value) || 0;
+  const date          = document.getElementById('pay-date').value;
+  const type          = document.querySelector('input[name="pay-type"]:checked').value;
+  const otherDesc     = document.getElementById('pay-other-desc').value.trim();
+  if (!debtId || !amount || !date) return;
+  payments.push({ id:nextId++, debtId, installmentId, amount, date, type, otherDesc });
+  if (installmentId) {
+    const inst = installments.find(i=>i.id===installmentId);
+    if (inst) inst.paid = true;
+  }
+  closeModal('modal-payment');
+  render();
+}
+
+function deleteDebtor(id) {
+  if (!confirm('¿Eliminar este deudor y todas sus deudas, cuotas y pagos?')) return;
+  const debtIds = debts.filter(d=>d.debtorId===id).map(d=>d.id);
+  debtors      = debtors.filter(d=>d.id!==id);
+  debts        = debts.filter(d=>d.debtorId!==id);
+  installments = installments.filter(i=>!debtIds.includes(i.debtId));
+  payments     = payments.filter(p=>!debtIds.includes(p.debtId));
+  if (filterPlan === id) filterPlan = 'all';
+  if (filterPay  === id) filterPay  = 'all';
+  render();
+}
+
+function deleteDebt(id) {
+  if (!confirm('¿Eliminar esta deuda y sus cuotas/pagos asociados?')) return;
+  debts        = debts.filter(d=>d.id!==id);
+  installments = installments.filter(i=>i.debtId!==id);
+  payments     = payments.filter(p=>p.debtId!==id);
+  render();
+}
+
+function deleteInstallment(id) {
+  installments = installments.filter(i=>i.id!==id);
+  render();
+}
+
+function deletePayment(id) {
+  const pay = payments.find(p=>p.id===id);
+  if (pay?.installmentId) {
+    const inst = installments.find(i=>i.id===pay.installmentId);
+    if (inst) inst.paid = false;
+  }
+  payments = payments.filter(p=>p.id!==id);
+  render();
+}
+
+// ── Init ──────────────────────────────────────────────────
+render();
 </script>
 </body>
 </html>
