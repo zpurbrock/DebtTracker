@@ -175,6 +175,7 @@
       <p id="current-date"></p>
     </div>
     <div class="topbar-right">
+      <button class="btn" onclick="openAddLenderModal()">+ Prestamista</button>
       <button class="btn" onclick="openAddDebtorModal()">+ Deudor</button>
       <button class="btn" onclick="openAddDebtModal()">+ Deuda</button>
       <button class="btn" onclick="openAddInstallmentModal()">+ Plan de pago</button>
@@ -245,6 +246,13 @@
     </div>
   </div>
 
+  <!-- Prestamistas -->
+  <div class="section-hdr">
+    <span class="section-title">Prestamistas</span>
+    <button class="btn sm" onclick="openAddLenderModal()">+ Prestamista</button>
+  </div>
+  <div class="debtors-list" id="lenders-list"></div>
+
   <!-- Deudores & Deudas -->
   <div class="section-hdr">
     <span class="section-title">Deudores y deudas</span>
@@ -305,6 +313,22 @@
   </div>
 </div>
 
+<!-- Modal: Nuevo prestamista -->
+<div id="modal-lender" class="modal-bg">
+  <div class="modal">
+    <h2>Nuevo prestamista</h2>
+    <div class="field">
+      <label>Nombre</label>
+      <input type="text" id="lender-name" placeholder="Ej: Banco BBVA, Carlos Ramírez" />
+      <div class="error-msg" id="lender-err">Ya existe un prestamista con ese nombre.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-lender')">Cancelar</button>
+      <button class="btn primary" onclick="addLender()">Agregar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Nueva deuda -->
 <div id="modal-debt" class="modal-bg">
   <div class="modal">
@@ -312,6 +336,10 @@
     <div class="field">
       <label>Deudor</label>
       <select id="debt-debtor"></select>
+    </div>
+    <div class="field">
+      <label>Prestamista <span class="hint">(opcional)</span></label>
+      <select id="debt-lender"></select>
     </div>
     <div class="field">
       <label>Nombre de la deuda</label>
@@ -425,6 +453,7 @@ const PAL = {
   purple: { bar:'#b57bff', light:'rgba(181,123,255,0.25)', pill:'background:rgba(181,123,255,0.15);color:#b57bff' },
 };
 
+let lenders      = JSON.parse(localStorage.getItem('dt2-lenders')      || '[]');
 let debtors      = JSON.parse(localStorage.getItem('dt2-debtors')      || '[]');
 let debts        = JSON.parse(localStorage.getItem('dt2-debts')        || '[]');
 let installments = JSON.parse(localStorage.getItem('dt2-installments') || '[]');
@@ -435,6 +464,7 @@ let filterPay    = 'all';
 let charts       = {};
 
 function save() {
+  localStorage.setItem('dt2-lenders',      JSON.stringify(lenders));
   localStorage.setItem('dt2-debtors',      JSON.stringify(debtors));
   localStorage.setItem('dt2-debts',        JSON.stringify(debts));
   localStorage.setItem('dt2-installments', JSON.stringify(installments));
@@ -490,6 +520,7 @@ function render() {
   document.getElementById('current-date').textContent   = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
   renderAlerts();
+  renderLenders();
   renderDebtors();
   renderPlanFilters();
   renderPlan();
@@ -513,6 +544,51 @@ function renderAlerts() {
   bar.classList.toggle('visible', overdue.length > 0 || upcoming.length > 0);
 }
 
+// ── Lenders ───────────────────────────────────────────────
+function renderLenders() {
+  const list = document.getElementById('lenders-list');
+  if (!lenders.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text3);padding:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">Sin prestamistas. Agrega uno con "+ Prestamista".</div>';
+    return;
+  }
+  list.innerHTML = lenders.map(lender => {
+    const lDebts  = debts.filter(d => d.lenderId === lender.id);
+    const totalL  = lDebts.reduce((s,d) => s + d.total, 0);
+    const paidL   = lDebts.reduce((s,d) => s + paidForDebt(d.id), 0);
+    const cards   = lDebts.map(d => {
+      const debtor = debtors.find(x => x.id === d.debtorId);
+      const paid   = paidForDebt(d.id);
+      const pct    = d.total ? Math.min(100, paid / d.total * 100) : 0;
+      const p      = col(d.color);
+      return `<div class="debt-card" style="min-height:unset">
+        <div class="dc-name">${d.name}</div>
+        <div class="dc-row" style="margin-bottom:6px">Deudor <span style="font-family:'DM Sans'">${debtor ? debtor.name : '—'}</span></div>
+        <div class="dc-row">Total <span>${fmt(d.total)}</span></div>
+        <div class="dc-row">Pagado <span>${fmt(paid)}</span></div>
+        <div class="dc-row">Saldo <span>${fmt(d.total - paid)}</span></div>
+        <div class="mini-bar"><div class="mini-fill" style="width:${pct.toFixed(1)}%;background:${p.bar}"></div></div>
+        <span class="pill" style="${p.pill}">${pct.toFixed(1)}% pagado</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="debtor-group">
+      <div class="debtor-header" onclick="toggleDebtor('l${lender.id}')">
+        <div>
+          <div class="debtor-name">${lender.name}</div>
+          <div class="debtor-meta">${lDebts.length} deuda${lDebts.length !== 1 ? 's' : ''} · Prestado: ${fmt(totalL)} · Cobrado: ${fmt(paidL)} · Saldo: ${fmt(totalL - paidL)}</div>
+        </div>
+        <div class="debtor-actions">
+          <button class="btn sm danger" onclick="event.stopPropagation();deleteLender(${lender.id})">Eliminar</button>
+          <span id="arrow-l${lender.id}" style="color:var(--text3);font-size:18px;transition:transform 0.2s">▾</span>
+        </div>
+      </div>
+      <div class="debtor-body" id="debtor-body-l${lender.id}">
+        ${lDebts.length ? `<div class="debtor-debts">${cards}</div>` : '<p style="color:var(--text3);font-size:13px;padding-top:8px">Sin deudas asociadas a este prestamista.</p>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 // ── Debtors ───────────────────────────────────────────────
 function renderDebtors() {
   const list = document.getElementById('debtors-list');
@@ -529,11 +605,13 @@ function renderDebtors() {
       const pct   = d.total ? Math.min(100, paid / d.total * 100) : 0;
       const p     = col(d.color);
       const cats  = d.categories || [];
-      const pend  = installments.filter(i => i.debtId === d.id && !i.paid).length;
-      const over  = installments.filter(i => i.debtId === d.id && instStatus(i) === 'overdue').length;
+      const pend   = installments.filter(i => i.debtId === d.id && !i.paid).length;
+      const over   = installments.filter(i => i.debtId === d.id && instStatus(i) === 'overdue').length;
+      const lender = d.lenderId ? lenders.find(l => l.id === d.lenderId) : null;
       return `<div class="debt-card">
         <button class="del-btn" onclick="event.stopPropagation();deleteDebt(${d.id})">✕</button>
         <div class="dc-name">${d.name}</div>
+        ${lender ? `<div class="dc-row" style="margin-bottom:6px">Prestamista <span style="color:var(--accent);font-family:'DM Sans'">${lender.name}</span></div>` : ''}
         ${cats.length ? `<div class="dc-cats">${cats.map(c => `<span class="tag">${c}</span>`).join('')}</div>` : ''}
         <div class="dc-row">Total <span>${fmt(d.total)}</span></div>
         <div class="dc-row">Pagado <span>${fmt(paid)}</span></div>
@@ -727,6 +805,13 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 document.querySelectorAll('.modal-bg').forEach(el => el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); }));
 document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-bg.open').forEach(m=>m.classList.remove('open')); });
 
+function openAddLenderModal() {
+  document.getElementById('lender-name').value = '';
+  document.getElementById('lender-err').classList.remove('visible');
+  openModal('modal-lender');
+  setTimeout(() => document.getElementById('lender-name').focus(), 100);
+}
+
 function openAddDebtorModal() {
   document.getElementById('debtor-name').value = '';
   document.getElementById('debtor-err').classList.remove('visible');
@@ -735,10 +820,12 @@ function openAddDebtorModal() {
 }
 
 function openAddDebtModal(preDebtorId) {
+  if (!debtors.length) { alert('Primero agrega un deudor.'); return; }
   const sel = document.getElementById('debt-debtor');
   sel.innerHTML = debtors.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
-  if (!debtors.length) { alert('Primero agrega un deudor.'); return; }
   if (preDebtorId) sel.value = preDebtorId;
+  const lSel = document.getElementById('debt-lender');
+  lSel.innerHTML = '<option value="">— Sin prestamista —</option>' + lenders.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
   document.getElementById('debt-name').value = '';
   document.getElementById('debt-total').value = '';
   document.getElementById('debt-cats-data').value = '[]';
@@ -861,8 +948,9 @@ function addDebt() {
   const total    = parseFloat(document.getElementById('debt-total').value) || 0;
   const categories = JSON.parse(document.getElementById('debt-cats-data').value || '[]');
   const color    = document.getElementById('debt-color').value;
+  const lenderId = parseInt(document.getElementById('debt-lender').value) || null;
   if (!debtorId || !name) return;
-  debts.push({ id:nextId++, debtorId, name, total, categories, color });
+  debts.push({ id:nextId++, debtorId, lenderId, name, total, categories, color });
   closeModal('modal-debt');
   render();
 }
@@ -907,6 +995,24 @@ function addPayment() {
     if (inst) inst.paid = true;
   }
   closeModal('modal-payment');
+  render();
+}
+
+function addLender() {
+  const name = document.getElementById('lender-name').value.trim();
+  if (!name) return;
+  const err = document.getElementById('lender-err');
+  if (lenders.some(l=>l.name.toLowerCase()===name.toLowerCase())) { err.classList.add('visible'); return; }
+  err.classList.remove('visible');
+  lenders.push({ id:nextId++, name });
+  closeModal('modal-lender');
+  render();
+}
+
+function deleteLender(id) {
+  if (!confirm('¿Eliminar este prestamista? Las deudas asociadas quedarán sin prestamista.')) return;
+  lenders = lenders.filter(l=>l.id!==id);
+  debts = debts.map(d => d.lenderId===id ? { ...d, lenderId:null } : d);
   render();
 }
 
