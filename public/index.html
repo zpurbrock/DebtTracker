@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debt Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #242424;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #f0f0f0;
+      --text2: #888;
+      --text3: #555;
+      --accent: #e8f55a;
+      --accent-dim: rgba(232,245,90,0.12);
+      --danger: #ff5c5c;
+      --success: #5cffa0;
+      --warning: #ffb347;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── Layout ── */
+    .app { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+
+    /* ── Topbar ── */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .topbar-left h1 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+    .topbar-left h1 span { color: var(--accent); }
+    .topbar-left p { font-size: 13px; color: var(--text2); margin-top: 2px; }
+    .topbar-right { display: flex; gap: 8px; }
+
+    /* ── Buttons ── */
+    .btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border2);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--surface); border-color: var(--border2); }
+    .btn.primary {
+      background: var(--accent);
+      color: #0f0f0f;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .btn.primary:hover { opacity: 0.88; }
+    .btn.danger { color: var(--danger); border-color: rgba(255,92,92,0.3); background: rgba(255,92,92,0.08); }
+    .btn.icon { padding: 6px 10px; font-size: 15px; }
+
+    /* ── Metrics ── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+    }
+    .metric .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .metric .value { font-size: 24px; font-weight: 600; font-family: 'DM Mono', monospace; letter-spacing: -1px; }
+    .metric .value.danger { color: var(--danger); }
+    .metric .value.success { color: var(--success); }
+    .metric .sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+    .progress-bar { height: 4px; background: var(--border); border-radius: 99px; margin-top: 10px; overflow: hidden; }
+    .progress-fill { height: 4px; background: var(--accent); border-radius: 99px; transition: width 0.5s ease; }
+
+    /* ── Section header ── */
+    .section-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Charts ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem;
+    }
+    .chart-card.full { grid-column: 1 / -1; }
+    .chart-card .chart-title { font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 14px; }
+    .chart-wrap { position: relative; height: 200px; }
+    .chart-wrap.tall { height: 220px; }
+
+    /* ── Debt cards ── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+    .debt-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem;
+      position: relative;
+      transition: border-color 0.15s;
+    }
+    .debt-card:hover { border-color: var(--border2); }
+    .debt-card .name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .debt-card .debtor { font-size: 12px; color: var(--text2); margin-bottom: 10px; }
+    .debt-card .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+    .debt-card .row span { color: var(--text); font-weight: 500; font-family: 'DM Mono', monospace; font-size: 12px; }
+    .mini-bar { height: 4px; background: var(--surface2); border-radius: 99px; margin: 10px 0 8px; overflow: hidden; }
+    .mini-fill { height: 4px; border-radius: 99px; transition: width 0.4s; }
+    .pill {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 9px;
+      border-radius: 99px;
+      letter-spacing: 0.02em;
+    }
+    .del-btn {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: none; border: none;
+      color: var(--text3); font-size: 14px;
+      cursor: pointer; line-height: 1;
+      transition: color 0.15s;
+    }
+    .del-btn:hover { color: var(--danger); }
+    .add-card {
+      border: 1px dashed var(--border2);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 160px;
+      background: none;
+      color: var(--text3);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .add-card:hover { background: var(--surface); color: var(--text2); border-color: var(--text3); }
+    .add-card .plus { font-size: 24px; line-height: 1; }
+
+    /* ── Filters ── */
+    .filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .filter-pill {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: none;
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-pill:hover { border-color: var(--border2); color: var(--text); }
+    .filter-pill.active { background: var(--accent); color: #0f0f0f; border-color: var(--accent); font-weight: 600; }
+
+    /* ── Table ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow-x: auto;
+      margin-bottom: 2rem;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 500px; }
+    thead { background: var(--surface2); }
+    th {
+      padding: 11px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    td {
+      padding: 11px 14px;
+      border-top: 1px solid var(--border);
+      color: var(--text);
+      white-space: nowrap;
+    }
+    td.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+    tr:hover td { background: var(--surface2); }
+    .badge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 9px;
+      border-radius: 99px;
+    }
+    .badge.paid { background: rgba(92,255,160,0.12); color: var(--success); }
+    .badge.pending { background: rgba(255,179,71,0.12); color: var(--warning); }
+    .empty-row td { text-align: center; color: var(--text3); padding: 2rem; }
+
+    /* ── Modal ── */
+    .modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 380px;
+    }
+    .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 1.25rem; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; }
+    .field input, .field select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field select option { background: var(--surface2); }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .metrics .metric:last-child { grid-column: 1 / -1; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .chart-card.full { grid-column: 1; }
+      .topbar-left h1 { font-size: 18px; }
+      .metric .value { font-size: 20px; }
+    }
+    @media (max-width: 400px) {
+      .metrics { grid-template-columns: 1fr; }
+      .metrics .metric:last-child { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <h1>Debt<span>Tracker</span></h1>
+      <p id="current-date"></p>
+    </div>
+    <div class="topbar-right">
+      <button class="btn" onclick="openModal('modal-cat')">+ Categoría</button>
+      <button class="btn primary" onclick="openPaymentModal()">+ Pago</button>
+    </div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics">
+    <div class="metric">
+      <div class="label">Deuda total</div>
+      <div class="value danger" id="m-total">$0</div>
+      <div class="sub" id="m-cats">0 categorías</div>
+    </div>
+    <div class="metric">
+      <div class="label">Total pagado</div>
+      <div class="value success" id="m-paid">$0</div>
+      <div class="sub" id="m-pct">0% del total</div>
+      <div class="progress-bar"><div class="progress-fill" id="m-bar" style="width:0%"></div></div>
+    </div>
+    <div class="metric">
+      <div class="label">Saldo pendiente</div>
+      <div class="value" id="m-balance">$0</div>
+      <div class="sub" id="m-debtors">0 deudores</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="section-hdr"><span class="section-title">Gráficas</span></div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Saldo vs pagado por categoría</div>
+      <div class="chart-wrap"><canvas id="chart-bar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Distribución de deuda</div>
+      <div class="chart-wrap"><canvas id="chart-donut"></canvas></div>
+    </div>
+    <div class="chart-card full">
+      <div class="chart-title">Pagos acumulados en el tiempo</div>
+      <div class="chart-wrap tall"><canvas id="chart-line"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Deuda por deudor</div>
+      <div class="chart-wrap"><canvas id="chart-debtor"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">% avance por categoría</div>
+      <div class="chart-wrap"><canvas id="chart-progress"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Category cards -->
+  <div class="section-hdr"><span class="section-title">Categorías y deudores</span></div>
+  <div class="cards-grid" id="cards-grid"></div>
+
+  <!-- Payments table -->
+  <div class="section-hdr">
+    <span class="section-title">Historial de pagos</span>
+  </div>
+  <div class="filters" id="filters"></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Mes / Año</th>
+          <th>Deudor</th>
+          <th>Categoría</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="payments-body"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Modal: Nueva categoría -->
+<div id="modal-cat" class="modal-bg">
+  <div class="modal">
+    <h2>Nueva categoría</h2>
+    <div class="field"><label>Nombre</label><input type="text" id="cat-name" placeholder="Ej: Hipoteca" /></div>
+    <div class="field"><label>Deudor</label><input type="text" id="cat-debtor" placeholder="Ej: Juan Pérez" /></div>
+    <div class="field"><label>Monto total de la deuda</label><input type="number" id="cat-total" placeholder="0" min="0" /></div>
+    <div class="field">
+      <label>Color</label>
+      <select id="cat-color">
+        <option value="yellow">Amarillo</option>
+        <option value="blue">Azul</option>
+        <option value="pink">Rosa</option>
+        <option value="green">Verde</option>
+        <option value="orange">Naranja</option>
+        <option value="purple">Morado</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-cat')">Cancelar</button>
+      <button class="btn primary" onclick="addCategory()">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Registrar pago -->
+<div id="modal-pay" class="modal-bg">
+  <div class="modal">
+    <h2>Registrar pago</h2>
+    <div class="field"><label>Categoría / Deudor</label><select id="pay-cat"></select></div>
+    <div class="field"><label>Monto</label><input type="number" id="pay-amount" placeholder="0" min="0" /></div>
+    <div class="field">
+      <label>Mes</label>
+      <select id="pay-month">
+        <option>Enero</option><option>Febrero</option><option>Marzo</option><option>Abril</option>
+        <option>Mayo</option><option>Junio</option><option>Julio</option><option>Agosto</option>
+        <option>Septiembre</option><option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+      </select>
+    </div>
+    <div class="field"><label>Año</label><input type="number" id="pay-year" value="2026" min="2020" max="2040" /></div>
+    <div class="field">
+      <label>Estado</label>
+      <select id="pay-status">
+        <option value="paid">Pagado</option>
+        <option value="pending">Pendiente</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-pay')">Cancelar</button>
+      <button class="btn primary" onclick="addPayment()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Paleta ──────────────────────────────────────────────
+  const PAL = {
+    yellow: { bar: '#e8f55a', light: 'rgba(232,245,90,0.25)', pill: 'background:rgba(232,245,90,0.15);color:#e8f55a' },
+    blue:   { bar: '#5ab4ff', light: 'rgba(90,180,255,0.25)', pill: 'background:rgba(90,180,255,0.15);color:#5ab4ff' },
+    pink:   { bar: '#ff7eb3', light: 'rgba(255,126,179,0.25)', pill: 'background:rgba(255,126,179,0.15);color:#ff7eb3' },
+    green:  { bar: '#5cffa0', light: 'rgba(92,255,160,0.25)', pill: 'background:rgba(92,255,160,0.15);color:#5cffa0' },
+    orange: { bar: '#ffb347', light: 'rgba(255,179,71,0.25)', pill: 'background:rgba(255,179,71,0.15);color:#ffb347' },
+    purple: { bar: '#b57bff', light: 'rgba(181,123,255,0.25)', pill: 'background:rgba(181,123,255,0.15);color:#b57bff' },
+  };
+
+  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  // ── Estado ──────────────────────────────────────────────
+  let categories = JSON.parse(localStorage.getItem('dt-cats') || 'null') || [
+    { id:1, name:'Transferencias (Esme)', debtor:'Esme', total:240000, color:'yellow' },
+    { id:2, name:'Coche', debtor:'Oscar', total:250000, color:'blue' },
+    { id:3, name:'Intereses', debtor:'Oscar', total:300000, color:'orange' },
+  ];
+  let payments = JSON.parse(localStorage.getItem('dt-pays') || 'null') || [
+    { id:1, catId:1, month:'Enero', year:2026, amount:10000, status:'paid' },
+    { id:2, catId:1, month:'Febrero', year:2026, amount:10000, status:'paid' },
+  ];
+  let filterDebtor = 'all';
+  let nextId = JSON.parse(localStorage.getItem('dt-nextid') || '10');
+  let charts = {};
+
+  function save() {
+    localStorage.setItem('dt-cats', JSON.stringify(categories));
+    localStorage.setItem('dt-pays', JSON.stringify(payments));
+    localStorage.setItem('dt-nextid', JSON.stringify(nextId));
+  }
+
+  const fmt = n => '$' + Math.round(n).toLocaleString('es-MX');
+  const paidFor = id => payments.filter(p => p.catId === id).reduce((s, p) => s + p.amount, 0);
+  const col = c => PAL[c] || PAL.yellow;
+  const shortName = (s, n=15) => s.length > n ? s.slice(0, n) + '…' : s;
+
+  // ── Render ──────────────────────────────────────────────
+  function render() {
+    const totalDebt = categories.reduce((s, c) => s + c.total, 0);
+    const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+    const balance = totalDebt - totalPaid;
+    const pct = totalDebt ? totalPaid / totalDebt * 100 : 0;
+    const debtors = [...new Set(categories.map(c => c.debtor))].length;
+
+    document.getElementById('m-total').textContent = fmt(totalDebt);
+    document.getElementById('m-cats').textContent = categories.length + ' categoría' + (categories.length !== 1 ? 's' : '');
+    document.getElementById('m-paid').textContent = fmt(totalPaid);
+    document.getElementById('m-pct').textContent = pct.toFixed(1) + '% del total';
+    document.getElementById('m-bar').style.width = pct.toFixed(1) + '%';
+    document.getElementById('m-balance').textContent = fmt(balance);
+    document.getElementById('m-debtors').textContent = debtors + ' deudor' + (debtors !== 1 ? 'es' : '');
+    document.getElementById('current-date').textContent = new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+
+    renderCards();
+    renderFilters();
+    renderPayments();
+    renderCharts();
+    save();
+  }
+
+  // ── Cards ────────────────────────────────────────────────
+  function renderCards() {
+    const grid = document.getElementById('cards-grid');
+    grid.innerHTML = '';
+    categories.forEach(c => {
+      const paid = paidFor(c.id);
+      const pct = c.total ? Math.min(100, paid / c.total * 100) : 0;
+      const p = col(c.color);
+      const div = document.createElement('div');
+      div.className = 'debt-card';
+      div.innerHTML = `
+        <button class="del-btn" onclick="deleteCategory(${c.id})">✕</button>
+        <div class="name">${c.name}</div>
+        <div class="debtor">Deudor: ${c.debtor}</div>
+        <div class="row">Total <span>${fmt(c.total)}</span></div>
+        <div class="row">Pagado <span>${fmt(paid)}</span></div>
+        <div class="row">Saldo <span>${fmt(c.total - paid)}</span></div>
+        <div class="mini-bar"><div class="mini-fill" style="width:${pct.toFixed(1)}%;background:${p.bar}"></div></div>
+        <span class="pill" style="${p.pill}">${pct.toFixed(1)}% pagado</span>`;
+      grid.appendChild(div);
+    });
+    const add = document.createElement('button');
+    add.className = 'add-card';
+    add.onclick = () => openModal('modal-cat');
+    add.innerHTML = '<span class="plus">+</span><span>Nueva categoría</span>';
+    grid.appendChild(add);
+  }
+
+  // ── Filters ──────────────────────────────────────────────
+  function renderFilters() {
+    const debtors = ['all', ...new Set(categories.map(c => c.debtor))];
+    const wrap = document.getElementById('filters');
+    wrap.innerHTML = '';
+    debtors.forEach(d => {
+      const btn = document.createElement('button');
+      btn.className = 'filter-pill' + (filterDebtor === d ? ' active' : '');
+      btn.textContent = d === 'all' ? 'Todos' : d;
+      btn.onclick = () => { filterDebtor = d; render(); };
+      wrap.appendChild(btn);
+    });
+  }
+
+  // ── Payments table ───────────────────────────────────────
+  function renderPayments() {
+    const tbody = document.getElementById('payments-body');
+    const rows = payments.filter(p => {
+      if (filterDebtor === 'all') return true;
+      const cat = categories.find(c => c.id === p.catId);
+      return cat && cat.debtor === filterDebtor;
+    });
+    if (!rows.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Sin pagos registrados</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(p => {
+      const cat = categories.find(c => c.id === p.catId);
+      return `<tr>
+        <td>${p.month} ${p.year}</td>
+        <td>${cat ? cat.debtor : '—'}</td>
+        <td>${cat ? cat.name : '—'}</td>
+        <td class="mono">${fmt(p.amount)}</td>
+        <td><span class="badge ${p.status}">${p.status === 'paid' ? 'Pagado' : 'Pendiente'}</span></td>
+        <td><button class="btn icon danger" onclick="deletePayment(${p.id})">✕</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Charts ───────────────────────────────────────────────
+  const axisOpts = () => ({
+    ticks: { color: '#555', font: { size: 11, family: 'DM Sans' } },
+    grid: { color: 'rgba(255,255,255,0.05)' }
+  });
+  const legendOpts = {
+    labels: { color: '#888', font: { size: 11, family: 'DM Sans' }, boxWidth: 10, padding: 12 }
+  };
+
+  function renderCharts() {
+    const labels = categories.map(c => shortName(c.name));
+    const barColors = categories.map(c => col(c.color).bar);
+    const lightColors = categories.map(c => col(c.color).light);
+    const paid = categories.map(c => paidFor(c.id));
+    const balances = categories.map((c, i) => Math.max(0, c.total - paid[i]));
+
+    // Bar: saldo vs pagado
+    if (charts.bar) charts.bar.destroy();
+    charts.bar = new Chart(document.getElementById('chart-bar'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Pagado', data: paid, backgroundColor: barColors, borderRadius: 4 },
+          { label: 'Saldo', data: balances, backgroundColor: lightColors, borderRadius: 4 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: legendOpts },
+        scales: {
+          x: axisOpts(),
+          y: { ...axisOpts(), ticks: { ...axisOpts().ticks, callback: v => '$' + Math.round(v / 1000) + 'k' } }
+        }
+      }
+    });
+
+    // Donut
+    if (charts.donut) charts.donut.destroy();
+    charts.donut = new Chart(document.getElementById('chart-donut'), {
+      type: 'doughnut',
+      data: {
+        labels: categories.map(c => shortName(c.name, 12)),
+        datasets: [{ data: categories.map(c => c.total), backgroundColor: barColors, borderWidth: 0, hoverOffset: 8 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '62%',
+        plugins: { legend: legendOpts }
+      }
+    });
+
+    // Line: acumulado
+    const allKeys = [];
+    [...payments].sort((a, b) => {
+      return (a.year * 100 + MONTHS.indexOf(a.month)) - (b.year * 100 + MONTHS.indexOf(b.month));
+    }).forEach(p => {
+      const k = p.month + ' ' + p.year;
+      if (!allKeys.includes(k)) allKeys.push(k);
+    });
+    if (!allKeys.length) allKeys.push('—');
+
+    const lineDatasets = categories.map(c => {
+      let cum = 0;
+      const data = allKeys.map(k => {
+        const [mo, yr] = k.split(' ');
+        cum += payments.filter(p => p.catId === c.id && p.month === mo && p.year === parseInt(yr)).reduce((s, p) => s + p.amount, 0);
+        return cum;
+      });
+      const p = col(c.color);
+      return { label: shortName(c.name), data, borderColor: p.bar, backgroundColor: p.light, fill: true, tension: 0.35, pointRadius: 4, pointBackgroundColor: p.bar };
+    });
+
+    if (charts.line) charts.line.destroy();
+    charts.line = new Chart(document.getElementById('chart-line'), {
+      type: 'line',
+      data: { labels: allKeys, datasets: lineDatasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: legendOpts },
+        scales: {
+          x: axisOpts(),
+          y: { ...axisOpts(), ticks: { ...axisOpts().ticks, callback: v => '$' + Math.round(v / 1000) + 'k' } }
+        }
+      }
+    });
+
+    // Debtor bar
+    const debtors = [...new Set(categories.map(c => c.debtor))];
+    const dTotals = debtors.map(d => categories.filter(c => c.debtor === d).reduce((s, c) => s + c.total, 0));
+    const dPaid = debtors.map(d => {
+      const ids = categories.filter(c => c.debtor === d).map(c => c.id);
+      return payments.filter(p => ids.includes(p.catId)).reduce((s, p) => s + p.amount, 0);
+    });
+    const dColors = debtors.map((_, i) => Object.values(PAL)[i % Object.keys(PAL).length].bar);
+
+    if (charts.debtor) charts.debtor.destroy();
+    charts.debtor = new Chart(document.getElementById('chart-debtor'), {
+      type: 'bar',
+      data: {
+        labels: debtors,
+        datasets: [
+          { label: 'Deuda total', data: dTotals, backgroundColor: dColors.map(c => c + '44'), borderRadius: 4 },
+          { label: 'Pagado', data: dPaid, backgroundColor: dColors, borderRadius: 4 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: legendOpts },
+        scales: {
+          x: axisOpts(),
+          y: { ...axisOpts(), ticks: { ...axisOpts().ticks, callback: v => '$' + Math.round(v / 1000) + 'k' } }
+        }
+      }
+    });
+
+    // Progress horizontal
+    const pcts = categories.map(c => { const p = paidFor(c.id); return c.total ? Math.round(p / c.total * 100) : 0; });
+    if (charts.progress) charts.progress.destroy();
+    charts.progress = new Chart(document.getElementById('chart-progress'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label: '% pagado', data: pcts, backgroundColor: barColors, borderRadius: 4 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ...axisOpts(), min: 0, max: 100, ticks: { ...axisOpts().ticks, callback: v => v + '%' } },
+          y: axisOpts()
+        }
+      }
+    });
+  }
+
+  // ── Modals ───────────────────────────────────────────────
+  function openModal(id) { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  function openPaymentModal() {
+    document.getElementById('pay-cat').innerHTML = categories
+      .map(c => `<option value="${c.id}">${c.name} (${c.debtor})</option>`).join('');
+    openModal('modal-pay');
+  }
+
+  // Close modal on bg click
+  document.querySelectorAll('.modal-bg').forEach(el => {
+    el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+  });
+
+  // ── CRUD ─────────────────────────────────────────────────
+  function addCategory() {
+    const name = document.getElementById('cat-name').value.trim();
+    const debtor = document.getElementById('cat-debtor').value.trim();
+    const total = parseFloat(document.getElementById('cat-total').value) || 0;
+    const color = document.getElementById('cat-color').value;
+    if (!name || !debtor) return;
+    categories.push({ id: nextId++, name, debtor, total, color });
+    closeModal('modal-cat');
+    ['cat-name', 'cat-debtor', 'cat-total'].forEach(id => document.getElementById(id).value = '');
+    render();
+  }
+
+  function addPayment() {
+    const catId = parseInt(document.getElementById('pay-cat').value);
+    const amount = parseFloat(document.getElementById('pay-amount').value) || 0;
+    const month = document.getElementById('pay-month').value;
+    const year = parseInt(document.getElementById('pay-year').value);
+    const status = document.getElementById('pay-status').value;
+    if (!catId || !amount) return;
+    payments.push({ id: nextId++, catId, month, year, amount, status });
+    closeModal('modal-pay');
+    document.getElementById('pay-amount').value = '';
+    render();
+  }
+
+  function deleteCategory(id) {
+    if (!confirm('¿Eliminar esta categoría y sus pagos?')) return;
+    categories = categories.filter(c => c.id !== id);
+    payments = payments.filter(p => p.catId !== id);
+    render();
+  }
+
+  function deletePayment(id) {
+    payments = payments.filter(p => p.id !== id);
+    render();
+  }
+
+  // ── Init ─────────────────────────────────────────────────
+  render();
+</script>
+</body>
+</html>
