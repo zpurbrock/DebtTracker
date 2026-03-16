@@ -154,6 +154,18 @@
     .radio-opt.selected { border-color:var(--accent); background:var(--accent-dim); }
     .hint { font-size:11px; color:var(--text3); }
 
+    /* Rubros */
+    .rubro-row { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+    .rubro-row input[type=text]   { flex:2; }
+    .rubro-row input[type=number] { flex:1; }
+    .rubro-row .rubro-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:16px; padding:0 4px; line-height:1; flex-shrink:0; }
+    .rubro-row .rubro-del:hover { color:var(--danger); }
+    .rubros-total { font-size:12px; color:var(--text2); text-align:right; margin-top:4px; }
+    .rubros-total span { color:var(--accent); font-family:'DM Mono',monospace; font-weight:600; }
+    .dc-rubros { margin:6px 0 8px; border-top:1px solid var(--border); padding-top:6px; }
+    .dc-rubro-row { display:flex; justify-content:space-between; font-size:11px; color:var(--text2); padding:2px 0; }
+    .dc-rubro-row span { font-family:'DM Mono',monospace; color:var(--text); font-size:11px; }
+
     /* Responsive */
     @media (max-width:768px) {
       .metrics { grid-template-columns:repeat(2,1fr); }
@@ -346,7 +358,13 @@
       <input type="text" id="debt-name" placeholder="Ej: Préstamo coche" />
     </div>
     <div class="field">
-      <label>Monto total</label>
+      <label>Rubros <span class="hint">(desglose opcional — el total se calcula automáticamente)</span></label>
+      <div id="rubros-list"></div>
+      <button type="button" class="btn sm" style="margin-top:4px" onclick="addRubroRow()">+ Agregar rubro</button>
+      <div class="rubros-total" id="rubros-total" style="display:none">Total rubros: <span id="rubros-sum">$0</span></div>
+    </div>
+    <div class="field">
+      <label>Monto total <span class="hint" id="total-hint">(o ingresa manualmente si no usas rubros)</span></label>
       <input type="number" id="debt-total" placeholder="0" min="0" step="0.01" />
     </div>
     <div class="field">
@@ -613,6 +631,7 @@ function renderDebtors() {
         <div class="dc-name">${d.name}</div>
         ${lender ? `<div class="dc-row" style="margin-bottom:6px">Prestamista <span style="color:var(--accent);font-family:'DM Sans'">${lender.name}</span></div>` : ''}
         ${cats.length ? `<div class="dc-cats">${cats.map(c => `<span class="tag">${c}</span>`).join('')}</div>` : ''}
+        ${(d.rubros||[]).length ? `<div class="dc-rubros">${(d.rubros).map(r=>`<div class="dc-rubro-row">${r.name} <span>${fmt(r.amount)}</span></div>`).join('')}</div>` : ''}
         <div class="dc-row">Total <span>${fmt(d.total)}</span></div>
         <div class="dc-row">Pagado <span>${fmt(paid)}</span></div>
         <div class="dc-row">Saldo <span>${fmt(d.total - paid)}</span></div>
@@ -828,6 +847,11 @@ function openAddDebtModal(preDebtorId) {
   lSel.innerHTML = '<option value="">— Sin prestamista —</option>' + lenders.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
   document.getElementById('debt-name').value = '';
   document.getElementById('debt-total').value = '';
+  document.getElementById('debt-total').readOnly = false;
+  document.getElementById('debt-total').style.opacity = '1';
+  document.getElementById('rubros-list').innerHTML = '';
+  document.getElementById('rubros-total').style.display = 'none';
+  document.getElementById('total-hint').textContent = '(o ingresa manualmente si no usas rubros)';
   document.getElementById('debt-cats-data').value = '[]';
   document.getElementById('debt-cats-wrap').querySelectorAll('.tag').forEach(t=>t.remove());
   document.getElementById('debt-cats-input').value = '';
@@ -930,6 +954,46 @@ document.getElementById('debt-cats-input').addEventListener('blur', function() {
   if (this.value.trim()) { addTag(this.value); this.value=''; }
 });
 
+// ── Rubros ────────────────────────────────────────────────
+function addRubroRow(name='', amount='') {
+  const list = document.getElementById('rubros-list');
+  const row  = document.createElement('div');
+  row.className = 'rubro-row';
+  row.innerHTML = `
+    <input type="text"   class="rubro-name"   placeholder="Nombre del rubro" value="${name}" oninput="updateRubroTotal()" style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 10px;outline:none;width:100%;transition:border-color 0.15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'" />
+    <input type="number" class="rubro-amount" placeholder="0" min="0" step="0.01" value="${amount}" oninput="updateRubroTotal()" style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 10px;outline:none;width:100%;transition:border-color 0.15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'" />
+    <button type="button" class="rubro-del" onclick="this.closest('.rubro-row').remove();updateRubroTotal()">✕</button>`;
+  list.appendChild(row);
+  updateRubroTotal();
+}
+
+function updateRubroTotal() {
+  const rows   = document.querySelectorAll('.rubro-row');
+  const sum    = [...rows].reduce((s,r) => s + (parseFloat(r.querySelector('.rubro-amount').value)||0), 0);
+  const sumEl  = document.getElementById('rubros-sum');
+  const totEl  = document.getElementById('rubros-total');
+  const totInput = document.getElementById('debt-total');
+  if (rows.length) {
+    totEl.style.display = 'block';
+    sumEl.textContent = fmt(sum);
+    totInput.value = sum || '';
+    totInput.readOnly = true;
+    totInput.style.opacity = '0.5';
+    document.getElementById('total-hint').textContent = '(calculado desde rubros)';
+  } else {
+    totEl.style.display = 'none';
+    totInput.readOnly = false;
+    totInput.style.opacity = '1';
+    document.getElementById('total-hint').textContent = '(o ingresa manualmente si no usas rubros)';
+  }
+}
+
+function getRubros() {
+  return [...document.querySelectorAll('.rubro-row')]
+    .map(r => ({ name: r.querySelector('.rubro-name').value.trim(), amount: parseFloat(r.querySelector('.rubro-amount').value)||0 }))
+    .filter(r => r.name || r.amount);
+}
+
 // ── CRUD ──────────────────────────────────────────────────
 function addDebtor() {
   const name = document.getElementById('debtor-name').value.trim();
@@ -943,14 +1007,15 @@ function addDebtor() {
 }
 
 function addDebt() {
-  const debtorId = parseInt(document.getElementById('debt-debtor').value);
-  const name     = document.getElementById('debt-name').value.trim();
-  const total    = parseFloat(document.getElementById('debt-total').value) || 0;
+  const debtorId   = parseInt(document.getElementById('debt-debtor').value);
+  const name       = document.getElementById('debt-name').value.trim();
+  const total      = parseFloat(document.getElementById('debt-total').value) || 0;
   const categories = JSON.parse(document.getElementById('debt-cats-data').value || '[]');
-  const color    = document.getElementById('debt-color').value;
-  const lenderId = parseInt(document.getElementById('debt-lender').value) || null;
+  const color      = document.getElementById('debt-color').value;
+  const lenderId   = parseInt(document.getElementById('debt-lender').value) || null;
+  const rubros     = getRubros();
   if (!debtorId || !name) return;
-  debts.push({ id:nextId++, debtorId, lenderId, name, total, categories, color });
+  debts.push({ id:nextId++, debtorId, lenderId, name, total, categories, color, rubros });
   closeModal('modal-debt');
   render();
 }
