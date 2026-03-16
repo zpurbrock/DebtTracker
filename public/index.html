@@ -344,7 +344,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-debtor')">Cancelar</button>
-      <button class="btn primary" onclick="addDebtor()">Agregar</button>
+      <button id="btn-save-debtor" class="btn primary" onclick="withSave('btn-save-debtor',addDebtor)">Agregar</button>
     </div>
   </div>
 </div>
@@ -360,7 +360,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-lender')">Cancelar</button>
-      <button class="btn primary" onclick="addLender()">Agregar</button>
+      <button id="btn-save-lender" class="btn primary" onclick="withSave('btn-save-lender',addLender)">Agregar</button>
     </div>
   </div>
 </div>
@@ -411,7 +411,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-debt')">Cancelar</button>
-      <button class="btn primary" onclick="addDebt()">Agregar</button>
+      <button id="btn-save-debt" class="btn primary" onclick="withSave('btn-save-debt',addDebt)">Agregar</button>
     </div>
   </div>
 </div>
@@ -451,7 +451,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-installment')">Cancelar</button>
-      <button class="btn primary" onclick="addInstallments()">Agregar</button>
+      <button id="btn-save-inst" class="btn primary" onclick="withSave('btn-save-inst',addInstallments)">Agregar</button>
     </div>
   </div>
 </div>
@@ -499,7 +499,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-payment')">Cancelar</button>
-      <button class="btn primary" onclick="addPayment()">Registrar</button>
+      <button id="btn-save-pay" class="btn primary" onclick="withSave('btn-save-pay',addPayment)">Registrar</button>
     </div>
   </div>
 </div>
@@ -1219,6 +1219,18 @@ function getRubros() {
 }
 
 // ── CRUD ──────────────────────────────────────────────────
+let _saving = false;
+function withSave(btnId, fn) {
+  if (_saving) return;
+  _saving = true;
+  const btn = btnId ? document.getElementById(btnId) : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  fn().finally(() => {
+    _saving = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  });
+}
+
 async function addDebtor() {
   const name = document.getElementById('debtor-name').value.trim();
   if (!name) return;
