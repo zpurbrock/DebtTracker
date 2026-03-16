@@ -234,26 +234,29 @@
   </div>
 
   <!-- Charts -->
-  <div class="section-hdr"><span class="section-title">Gráficas</span></div>
+  <div class="section-hdr">
+    <span class="section-title">Gráficas</span>
+    <div style="display:flex;gap:6px">
+      <button class="filter-pill active" id="cv-lender"  onclick="setChartView('lender')">Por prestamista</button>
+      <button class="filter-pill"        id="cv-debtor"  onclick="setChartView('debtor')">Por deudor</button>
+      <button class="filter-pill"        id="cv-debt"    onclick="setChartView('debt')">Por deuda</button>
+    </div>
+  </div>
   <div class="charts-grid">
     <div class="chart-card">
-      <div class="chart-title">Saldo vs pagado por deuda</div>
+      <div class="chart-title" id="ct-bar">Saldo vs pagado</div>
       <div class="chart-wrap"><canvas id="chart-bar"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Distribución de deuda</div>
+      <div class="chart-title" id="ct-donut">Distribución</div>
       <div class="chart-wrap"><canvas id="chart-donut"></canvas></div>
     </div>
     <div class="chart-card full">
-      <div class="chart-title">Pagos acumulados en el tiempo</div>
+      <div class="chart-title" id="ct-line">Pagos acumulados en el tiempo</div>
       <div class="chart-wrap tall"><canvas id="chart-line"></canvas></div>
     </div>
-    <div class="chart-card">
-      <div class="chart-title">Deuda por deudor</div>
-      <div class="chart-wrap"><canvas id="chart-debtor"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">% avance por deuda</div>
+    <div class="chart-card full">
+      <div class="chart-title" id="ct-progress">% avance</div>
       <div class="chart-wrap"><canvas id="chart-progress"></canvas></div>
     </div>
   </div>
@@ -479,6 +482,7 @@ let payments     = JSON.parse(localStorage.getItem('dt2-payments')     || '[]');
 let nextId       = JSON.parse(localStorage.getItem('dt2-nextid')       || '1');
 let filterPlan   = 'all';
 let filterPay    = 'all';
+let chartView    = 'lender';
 let charts       = {};
 
 function save() {
@@ -796,15 +800,70 @@ function renderPaymentsTable() {
 const axisOpts = () => ({ ticks:{ color:'#555', font:{ size:11, family:'DM Sans' } }, grid:{ color:'rgba(255,255,255,0.05)' } });
 const legendOpts = { labels:{ color:'#888', font:{ size:11, family:'DM Sans' }, boxWidth:10, padding:12 } };
 
+function setChartView(v) {
+  chartView = v;
+  ['lender','debtor','debt'].forEach(k => document.getElementById('cv-'+k).classList.toggle('active', k===v));
+  renderCharts();
+}
+
+function getChartEntities() {
+  const palVals = Object.values(PAL);
+  if (chartView === 'lender') {
+    const groups = lenders.map((l,i) => ({
+      name: l.name,
+      debtIds: debts.filter(d=>d.lenderId===l.id).map(d=>d.id),
+      pal: palVals[i % 6]
+    }));
+    const noLender = debts.filter(d=>!d.lenderId).map(d=>d.id);
+    if (noLender.length) groups.push({ name:'Sin prestamista', debtIds:noLender, pal:PAL.purple });
+    return groups.map(g => ({
+      name: g.name,
+      total: debts.filter(d=>g.debtIds.includes(d.id)).reduce((s,d)=>s+d.total,0),
+      paid:  payments.filter(p=>g.debtIds.includes(p.debtId)).reduce((s,p)=>s+p.amount,0),
+      debtIds: g.debtIds,
+      pal: g.pal
+    })).filter(e=>e.total>0||e.debtIds.length);
+  }
+  if (chartView === 'debtor') {
+    return debtors.map((d,i) => {
+      const debtIds = debts.filter(dt=>dt.debtorId===d.id).map(dt=>dt.id);
+      return {
+        name: d.name,
+        total: debts.filter(dt=>dt.debtorId===d.id).reduce((s,dt)=>s+dt.total,0),
+        paid:  payments.filter(p=>debtIds.includes(p.debtId)).reduce((s,p)=>s+p.amount,0),
+        debtIds,
+        pal: palVals[i % 6]
+      };
+    });
+  }
+  // debt
+  return debts.map(d => ({
+    name: d.name,
+    total: d.total,
+    paid: paidForDebt(d.id),
+    debtIds: [d.id],
+    pal: PAL[d.color] || PAL.yellow
+  }));
+}
+
 function renderCharts() {
-  ['bar','donut','line','debtor','progress'].forEach(k => { if (charts[k]) { charts[k].destroy(); charts[k] = null; } });
+  ['bar','donut','line','progress'].forEach(k => { if (charts[k]) { charts[k].destroy(); charts[k] = null; } });
   if (!debts.length) return;
 
-  const labels     = debts.map(d => short(d.name));
-  const barColors  = debts.map(d => col(d.color).bar);
-  const lightColors= debts.map(d => col(d.color).light);
-  const paid       = debts.map(d => paidForDebt(d.id));
-  const balances   = debts.map((d,i) => Math.max(0, d.total - paid[i]));
+  const entities   = getChartEntities();
+  if (!entities.length) return;
+
+  const viewLabel  = chartView==='lender' ? 'prestamista' : chartView==='debtor' ? 'deudor' : 'deuda';
+  document.getElementById('ct-bar').textContent      = `Saldo vs pagado por ${viewLabel}`;
+  document.getElementById('ct-donut').textContent    = `Distribución por ${viewLabel}`;
+  document.getElementById('ct-line').textContent     = `Pagos acumulados en el tiempo por ${viewLabel}`;
+  document.getElementById('ct-progress').textContent = `% avance por ${viewLabel}`;
+
+  const labels     = entities.map(e => short(e.name));
+  const barColors  = entities.map(e => e.pal.bar);
+  const lightColors= entities.map(e => e.pal.light);
+  const paid       = entities.map(e => e.paid);
+  const balances   = entities.map(e => Math.max(0, e.total - e.paid));
 
   charts.bar = new Chart(document.getElementById('chart-bar'), {
     type:'bar', data:{ labels, datasets:[
@@ -816,18 +875,20 @@ function renderCharts() {
   });
 
   charts.donut = new Chart(document.getElementById('chart-donut'), {
-    type:'doughnut', data:{ labels:debts.map(d=>short(d.name,12)), datasets:[{ data:debts.map(d=>d.total), backgroundColor:barColors, borderWidth:0, hoverOffset:8 }] },
+    type:'doughnut', data:{ labels:entities.map(e=>short(e.name,14)), datasets:[{ data:entities.map(e=>e.total), backgroundColor:barColors, borderWidth:0, hoverOffset:8 }] },
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{ legend:legendOpts } }
   });
 
   const sortedPays = [...payments].sort((a,b)=>a.date.localeCompare(b.date));
   const allMonths  = [...new Set(sortedPays.map(p=>p.date.slice(0,7)))];
   if (!allMonths.length) allMonths.push(todayStr().slice(0,7));
-  const lineDS = debts.map(d => {
+  const lineDS = entities.map(e => {
     let cum = 0;
-    const data = allMonths.map(ym => { cum += payments.filter(p=>p.debtId===d.id&&p.date.slice(0,7)===ym).reduce((s,p)=>s+p.amount,0); return cum; });
-    const p = col(d.color);
-    return { label:short(d.name), data, borderColor:p.bar, backgroundColor:p.light, fill:true, tension:0.35, pointRadius:4, pointBackgroundColor:p.bar };
+    const data = allMonths.map(ym => {
+      cum += payments.filter(p=>e.debtIds.includes(p.debtId)&&p.date.slice(0,7)===ym).reduce((s,p)=>s+p.amount,0);
+      return cum;
+    });
+    return { label:short(e.name), data, borderColor:e.pal.bar, backgroundColor:e.pal.light, fill:true, tension:0.35, pointRadius:4, pointBackgroundColor:e.pal.bar };
   });
   charts.line = new Chart(document.getElementById('chart-line'), {
     type:'line', data:{ labels:allMonths, datasets:lineDS },
@@ -835,19 +896,9 @@ function renderCharts() {
       scales:{ x:axisOpts(), y:{ ...axisOpts(), ticks:{ ...axisOpts().ticks, callback:v=>'$'+Math.round(v/1000)+'k' } } } }
   });
 
-  const dTotals = debtors.map(d => debts.filter(dt=>dt.debtorId===d.id).reduce((s,dt)=>s+dt.total,0));
-  const dPaid   = debtors.map(d => { const ids=debts.filter(dt=>dt.debtorId===d.id).map(dt=>dt.id); return payments.filter(p=>ids.includes(p.debtId)).reduce((s,p)=>s+p.amount,0); });
-  const dColors = debtors.map((_,i) => Object.values(PAL)[i % 6].bar);
-  charts.debtor = new Chart(document.getElementById('chart-debtor'), {
-    type:'bar', data:{ labels:debtors.map(d=>d.name), datasets:[
-      { label:'Deuda total', data:dTotals, backgroundColor:dColors.map(c=>c+'44'), borderRadius:4 },
-      { label:'Pagado', data:dPaid, backgroundColor:dColors, borderRadius:4 }
-    ]},
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:legendOpts },
-      scales:{ x:axisOpts(), y:{ ...axisOpts(), ticks:{ ...axisOpts().ticks, callback:v=>'$'+Math.round(v/1000)+'k' } } } }
-  });
-
-  const pcts = debts.map(d => { const p=paidForDebt(d.id); return d.total ? Math.round(p/d.total*100) : 0; });
+  const pcts = entities.map(e => e.total ? Math.round(e.paid/e.total*100) : 0);
+  const progressHeight = Math.max(180, entities.length * 32);
+  document.getElementById('chart-progress').parentElement.style.height = progressHeight + 'px';
   charts.progress = new Chart(document.getElementById('chart-progress'), {
     type:'bar', data:{ labels, datasets:[{ label:'% pagado', data:pcts, backgroundColor:barColors, borderRadius:4 }] },
     options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
