@@ -1078,7 +1078,8 @@ function openPaymentModal(preDebtId, preInstId) {
   document.querySelector('input[name="pay-type"][value="transfer"]').checked = true;
   document.querySelectorAll('#pay-type-group .radio-opt').forEach(el=>el.classList.remove('selected'));
   document.getElementById('rl-transfer').classList.add('selected');
-  // Ocultar selector de cuota si viene previnculado desde una fila
+  // Guardar cuota previnculada y ocultar selector si viene desde una fila
+  _preInstId = preInstId || null;
   document.getElementById('pay-inst-field').style.display = preInstId ? 'none' : '';
   updatePayDebt(preInstId);
   openModal('modal-payment');
@@ -1301,7 +1302,7 @@ async function addInstallments() {
 
 async function addPayment() {
   const debtId        = parseInt(document.getElementById('pay-debt').value);
-  const installmentId = parseInt(document.getElementById('pay-inst').value) || null;
+  const installmentId = _preInstId || parseInt(document.getElementById('pay-inst').value) || null;
   const amount        = parseFloat(document.getElementById('pay-amount').value) || 0;
   const date          = document.getElementById('pay-date').value;
   const type          = document.querySelector('input[name="pay-type"]:checked').value;
@@ -1325,6 +1326,7 @@ async function addPayment() {
       const inst = installments.find(i=>i.id===installmentId);
       if (inst) inst.paid = true;
     }
+    _preInstId = null;
     clearEvidenceInput();
     closeModal('modal-payment');
     render();
@@ -1464,6 +1466,7 @@ function clearEvidenceInput() {
 }
 
 let _evidencePayId = null;
+let _preInstId     = null;
 
 async function openEvidenceModal(payId) {
   const pay = payments.find(p => p.id === payId);
