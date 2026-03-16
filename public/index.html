@@ -662,6 +662,7 @@ function renderDebtors() {
         <div class="dc-actions">
           <button class="btn sm" onclick="openAddInstallmentModal(${d.id})">+ Cuota</button>
           <button class="btn sm primary" onclick="openPaymentModal(${d.id})">+ Pago</button>
+          ${installments.some(i=>i.debtId===d.id) ? `<button class="btn sm danger" onclick="deletePlan(${d.id})">Borrar plan</button>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -1250,6 +1251,14 @@ function deleteDebt(id) {
   debts        = debts.filter(d=>d.id!==id);
   installments = installments.filter(i=>i.debtId!==id);
   payments     = payments.filter(p=>p.debtId!==id);
+  render();
+}
+
+function deletePlan(debtId) {
+  const debt  = debts.find(d=>d.id===debtId);
+  const count = installments.filter(i=>i.debtId===debtId).length;
+  if (!confirm(`¿Eliminar el plan completo de "${debt?.name}" (${count} cuota${count!==1?'s':''})? Los pagos registrados no se eliminarán.`)) return;
+  installments = installments.filter(i=>i.debtId!==debtId);
   render();
 }
 
