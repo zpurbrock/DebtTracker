@@ -504,11 +504,21 @@
   </div>
 </div>
 
-<!-- Modal: Ver evidencia -->
+<!-- Modal: Ver/agregar evidencia -->
 <div id="modal-evidence" class="modal-bg">
   <div class="modal" style="max-width:500px">
     <h2>Evidencia de pago</h2>
     <div class="ev-list" id="ev-list"></div>
+    <div style="margin-top:14px">
+      <div class="ev-drop" id="ev-add-drop"
+           onclick="document.getElementById('ev-add-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="event.preventDefault();this.classList.remove('drag-over');addEvidenceToPayment(event.dataTransfer.files)">
+        <input type="file" id="ev-add-input" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" onchange="addEvidenceToPayment(this.files)" />
+        + Agregar más archivos
+      </div>
+    </div>
     <div class="modal-actions" style="margin-top:1rem">
       <button class="btn" onclick="closeModal('modal-evidence')">Cerrar</button>
     </div>
@@ -820,8 +830,9 @@ function renderPlan() {
       <td style="color:var(--text2)">${inst.description || '—'}</td>
       <td class="mono">${fmt(inst.amount)}</td>
       <td><span class="badge ${st}">${labels[st]}</span></td>
-      <td style="display:flex;gap:4px">
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
         ${!inst.paid ? `<button class="btn sm primary" onclick="openPaymentModal(${inst.debtId},${inst.id})">Pagar</button>` : ''}
+        ${inst.paid ? (() => { const lp = payments.filter(p=>p.installmentId===inst.id).sort((a,b)=>b.id-a.id)[0]; return lp ? `<button class="btn sm" style="font-size:11px;padding:3px 8px" onclick="openEvidenceModal(${lp.id})">📎 Evidencia</button>` : ''; })() : ''}
         <button class="btn sm danger" onclick="deleteInstallment(${inst.id})">✕</button>
       </td>
     </tr>`;
@@ -863,7 +874,10 @@ function renderPaymentsTable() {
       <td class="mono">${fmt(p.amount)}</td>
       <td style="color:var(--text2);font-size:12px">${payTypeName(p.type, p.otherDesc)}</td>
       <td style="color:var(--text2);font-size:12px">${inst ? fmtDate(inst.dueDate) + (inst.description ? ' · ' + inst.description : '') : '—'}</td>
-      <td>${evCount ? `<span class="ev-badge" onclick="openEvidenceModal(${p.id})">📎 ${evCount}</span>` : '<span style="color:var(--text3);font-size:12px">—</span>'}</td>
+      <td style="display:flex;align-items:center;gap:6px">
+        ${evCount ? `<span class="ev-badge" onclick="openEvidenceModal(${p.id})">📎 ${evCount}</span>` : ''}
+        <button class="btn sm" style="font-size:11px;padding:3px 8px" onclick="openEvidenceModal(${p.id})">${evCount ? '+ Agregar' : '📎 Agregar'}</button>
+      </td>
       <td><button class="btn icon danger" onclick="deletePayment(${p.id})">✕</button></td>
     </tr>`;
   }).join('');
@@ -1401,12 +1415,25 @@ function clearEvidenceInput() {
   document.getElementById('pay-evidence').value = '';
 }
 
+let _evidencePayId = null;
+
 async function openEvidenceModal(payId) {
   const pay = payments.find(p => p.id === payId);
-  if (!pay || !(pay.evidence||[]).length) return;
-  const list = document.getElementById('ev-list');
-  list.innerHTML = '<div style="color:var(--text3);font-size:13px">Cargando…</div>';
+  if (!pay) return;
+  _evidencePayId = payId;
+  document.getElementById('ev-add-input').value = '';
   openModal('modal-evidence');
+  await refreshEvidenceList(pay);
+}
+
+async function refreshEvidenceList(pay) {
+  if (!pay) pay = payments.find(p => p.id === _evidencePayId);
+  const list = document.getElementById('ev-list');
+  if (!(pay.evidence||[]).length) {
+    list.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0">Sin evidencias aún. Agrega archivos abajo.</div>';
+    return;
+  }
+  list.innerHTML = '<div style="color:var(--text3);font-size:13px">Cargando…</div>';
   const items = await Promise.all(pay.evidence.map(async ev => {
     const blob = await dbGet(ev.id).catch(() => null);
     const url  = blob ? URL.createObjectURL(blob) : null;
@@ -1423,8 +1450,34 @@ async function openEvidenceModal(payId) {
       </div>
       <div class="ev-item-actions">
         ${url ? `<button class="btn sm" onclick="downloadEvidence('${ev.id}','${ev.name.replace(/'/g,"\\'")}','${ev.type}')">Descargar</button>` : '<span style="font-size:11px;color:var(--danger)">No disponible</span>'}
+        <button class="btn sm danger" onclick="removeEvidenceFromPayment('${ev.id}')">✕</button>
       </div>
     </div>`).join('');
+}
+
+async function addEvidenceToPayment(files) {
+  const pay = payments.find(p => p.id === _evidencePayId);
+  if (!pay || !files.length) return;
+  if (!pay.evidence) pay.evidence = [];
+  for (const file of files) {
+    const evId = 'ev_' + nextId++;
+    await dbPut(evId, file);
+    pay.evidence.push({ id:evId, name:file.name, type:file.type, size:file.size });
+  }
+  document.getElementById('ev-add-input').value = '';
+  save();
+  render();
+  await refreshEvidenceList(pay);
+}
+
+async function removeEvidenceFromPayment(evId) {
+  const pay = payments.find(p => p.id === _evidencePayId);
+  if (!pay) return;
+  await dbDel(evId);
+  pay.evidence = (pay.evidence||[]).filter(e => e.id !== evId);
+  save();
+  render();
+  await refreshEvidenceList(pay);
 }
 
 async function downloadEvidence(evId, name, type) {
