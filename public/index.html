@@ -285,7 +285,7 @@
     <table>
       <thead>
         <tr>
-          <th>Vencimiento</th><th>Deudor</th><th>Deuda</th>
+          <th>Vencimiento</th><th>Deudor</th><th>Deuda</th><th>Rubro</th>
           <th>Descripción</th><th>Monto</th><th>Estado</th><th></th>
         </tr>
       </thead>
@@ -302,7 +302,7 @@
     <table>
       <thead>
         <tr>
-          <th>Fecha</th><th>Deudor</th><th>Deuda</th>
+          <th>Fecha</th><th>Deudor</th><th>Deuda</th><th>Rubro</th>
           <th>Monto</th><th>Tipo de pago</th><th>Cuota</th><th></th>
         </tr>
       </thead>
@@ -401,7 +401,11 @@
     <h2>Agregar cuotas</h2>
     <div class="field">
       <label>Deuda</label>
-      <select id="inst-debt"></select>
+      <select id="inst-debt" onchange="updateInstRubro()"></select>
+    </div>
+    <div class="field" id="inst-rubro-field" style="display:none">
+      <label>Rubro <span class="hint">(opcional)</span></label>
+      <select id="inst-rubro"></select>
     </div>
     <div class="field">
       <label>Tipo</label>
@@ -437,7 +441,11 @@
     <h2>Registrar pago</h2>
     <div class="field">
       <label>Deuda</label>
-      <select id="pay-debt" onchange="updatePayInstallments()"></select>
+      <select id="pay-debt" onchange="updatePayDebt()"></select>
+    </div>
+    <div class="field" id="pay-rubro-field" style="display:none">
+      <label>Rubro <span class="hint">(opcional)</span></label>
+      <select id="pay-rubro" onchange="updatePayInstallments()"></select>
     </div>
     <div class="field">
       <label>Vincular a cuota <span class="hint">(opcional)</span></label>
@@ -635,7 +643,13 @@ function renderDebtors() {
         <div class="dc-name">${d.name}</div>
         ${lender ? `<div class="dc-row" style="margin-bottom:6px">Prestamista <span style="color:var(--accent);font-family:'DM Sans'">${lender.name}</span></div>` : ''}
         ${cats.length ? `<div class="dc-cats">${cats.map(c => `<span class="tag">${c}</span>`).join('')}</div>` : ''}
-        ${(d.rubros||[]).length ? `<div class="dc-rubros">${(d.rubros).map(r=>`<div class="dc-rubro-row">${r.name} <span>${fmt(r.amount)}</span></div>`).join('')}</div>` : ''}
+        ${(d.rubros||[]).length ? `<div class="dc-rubros">${d.rubros.map((r,ri)=>{
+          const rpaid = payments.filter(p=>p.debtId===d.id&&p.rubroIdx===ri).reduce((s,p)=>s+p.amount,0);
+          const rpct  = r.amount ? Math.min(100, rpaid/r.amount*100).toFixed(0) : 0;
+          return `<div class="dc-rubro-row">${r.name} <span>${fmt(r.amount)}</span></div>`+
+            `<div class="dc-rubro-row" style="font-size:10px"><span style="color:var(--text3)">pagado ${fmt(rpaid)}</span><span style="color:var(--text3)">${rpct}%</span></div>`+
+            `<div style="height:2px;background:var(--border);border-radius:99px;margin:2px 0 5px;overflow:hidden"><div style="height:2px;background:var(--success);width:${rpct}%"></div></div>`;
+        }).join('')}</div>` : ''}
         <div class="dc-row">Total <span>${fmt(d.total)}</span></div>
         <div class="dc-row">Pagado <span>${fmt(paid)}</span></div>
         <div class="dc-row">Saldo <span>${fmt(d.total - paid)}</span></div>
@@ -712,42 +726,48 @@ function renderPlan() {
     return;
   }
 
-  // Calculate unplanned balance per debt
-  const debtIds = [...new Set(rows.map(i => i.debtId))];
-  const unplanned = {};
-  debtIds.forEach(did => {
+  // Calculate unplanned balance: per rubro if debt has rubros, else per debt total
+  const seenDebtIds = [...new Set(rows.map(i => i.debtId))];
+  const warnings = {}; // key: `debtId` or `debtId_rubroIdx` → warning message
+  seenDebtIds.forEach(did => {
     const debt = debts.find(d => d.id === did);
     if (!debt) return;
-    const allInst = installments.filter(i => i.debtId === did);
-    const planned = allInst.reduce((s,i) => s + i.amount, 0);
-    const gap = debt.total - planned;
-    if (gap > 0.01) unplanned[did] = gap;
+    if ((debt.rubros||[]).length) {
+      debt.rubros.forEach((r, ri) => {
+        const planned = installments.filter(i => i.debtId===did && i.rubroIdx===ri).reduce((s,i)=>s+i.amount,0);
+        const gap = r.amount - planned;
+        if (gap > 0.01) warnings[`${did}_${ri}`] = `${debt.name} · ${r.name} — faltan por planificar <strong>${fmt(gap)}</strong>`;
+      });
+    } else {
+      const planned = installments.filter(i => i.debtId===did).reduce((s,i)=>s+i.amount,0);
+      const gap = debt.total - planned;
+      if (gap > 0.01) warnings[`${did}`] = `${debt.name} — faltan por planificar <strong>${fmt(gap)}</strong> para cubrir el saldo total`;
+    }
   });
 
   const labels = { paid:'Pagado', pending:'Pendiente', overdue:'Vencido', upcoming:'Por vencer' };
   let html = '';
-  let lastDebtId = null;
+  const shownWarnings = new Set();
 
   rows.forEach(inst => {
     const debt   = debts.find(d => d.id === inst.debtId);
     const debtor = debt ? debtors.find(d => d.id === debt.debtorId) : null;
     const st     = instStatus(inst);
 
-    // Insert unplanned warning row when switching to a new debt that has a gap
-    if (inst.debtId !== lastDebtId && unplanned[inst.debtId]) {
+    // Show relevant warning once before first installment of that debt/rubro
+    const wKey = inst.rubroIdx !== null && inst.rubroIdx !== undefined ? `${inst.debtId}_${inst.rubroIdx}` : `${inst.debtId}`;
+    if (warnings[wKey] && !shownWarnings.has(wKey)) {
+      shownWarnings.add(wKey);
       html += `<tr style="background:rgba(255,92,92,0.06)">
-        <td colspan="5" style="color:var(--danger);font-size:12px;padding:8px 14px">
-          ⚠ ${debt ? debt.name : ''} — faltan por planificar <strong>${fmt(unplanned[inst.debtId])}</strong> para cubrir el saldo total
-        </td>
-        <td colspan="2"></td>
+        <td colspan="8" style="color:var(--danger);font-size:12px;padding:8px 14px">⚠ ${warnings[wKey]}</td>
       </tr>`;
     }
-    lastDebtId = inst.debtId;
 
     html += `<tr class="${st === 'overdue' ? 'row-overdue' : st === 'upcoming' ? 'row-upcoming' : ''}">
       <td class="mono">${fmtDate(inst.dueDate)}</td>
       <td>${debtor ? debtor.name : '—'}</td>
       <td>${debt ? debt.name : '—'}</td>
+      <td style="color:var(--text2);font-size:12px">${inst.rubroIdx !== null && inst.rubroIdx !== undefined ? rubroName(inst.debtId, inst.rubroIdx) : '—'}</td>
       <td style="color:var(--text2)">${inst.description || '—'}</td>
       <td class="mono">${fmt(inst.amount)}</td>
       <td><span class="badge ${st}">${labels[st]}</span></td>
@@ -777,17 +797,19 @@ function renderPaymentsTable() {
     rows = rows.filter(p => debtIds.includes(p.debtId));
   }
   if (!rows.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Sin pagos registrados</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Sin pagos registrados</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(p => {
     const debt   = debts.find(d => d.id === p.debtId);
     const debtor = debt ? debtors.find(d => d.id === debt.debtorId) : null;
     const inst   = p.installmentId ? installments.find(i => i.id === p.installmentId) : null;
+    const rubro  = p.rubroIdx !== null && p.rubroIdx !== undefined ? rubroName(p.debtId, p.rubroIdx) : '—';
     return `<tr>
       <td class="mono">${fmtDate(p.date)}</td>
       <td>${debtor ? debtor.name : '—'}</td>
       <td>${debt ? debt.name : '—'}</td>
+      <td style="color:var(--text2);font-size:12px">${rubro}</td>
       <td class="mono">${fmt(p.amount)}</td>
       <td style="color:var(--text2);font-size:12px">${payTypeName(p.type, p.otherDesc)}</td>
       <td style="color:var(--text2);font-size:12px">${inst ? fmtDate(inst.dueDate) + (inst.description ? ' · ' + inst.description : '') : '—'}</td>
@@ -951,6 +973,7 @@ function openAddInstallmentModal(preDebtId) {
   const sel = document.getElementById('inst-debt');
   sel.innerHTML = debts.map(d => { const dr=debtors.find(x=>x.id===d.debtorId); return `<option value="${d.id}">${dr?dr.name+' · ':''}${d.name}</option>`; }).join('');
   if (preDebtId) sel.value = preDebtId;
+  updateInstRubro();
   document.getElementById('inst-date').value = todayStr();
   document.getElementById('inst-start-date').value = todayStr();
   ['inst-amount','inst-monthly-amount','inst-num','inst-desc'].forEach(id => document.getElementById(id).value = '');
@@ -960,6 +983,11 @@ function openAddInstallmentModal(preDebtId) {
   document.getElementById('rl-single').classList.add('selected');
   document.getElementById('rl-monthly').classList.remove('selected');
   openModal('modal-installment');
+}
+
+function updateInstRubro() {
+  const debtId = parseInt(document.getElementById('inst-debt').value);
+  updateDebtRubroSelect('inst-rubro', 'inst-rubro-field', debtId);
 }
 
 function openPaymentModal(preDebtId, preInstId) {
@@ -974,14 +1002,24 @@ function openPaymentModal(preDebtId, preInstId) {
   document.querySelector('input[name="pay-type"][value="transfer"]').checked = true;
   document.querySelectorAll('#pay-type-group .radio-opt').forEach(el=>el.classList.remove('selected'));
   document.getElementById('rl-transfer').classList.add('selected');
-  updatePayInstallments(preInstId);
+  updatePayDebt(preInstId);
   openModal('modal-payment');
 }
 
+function updatePayDebt(preInstId) {
+  const debtId = parseInt(document.getElementById('pay-debt').value);
+  updateDebtRubroSelect('pay-rubro', 'pay-rubro-field', debtId);
+  updatePayInstallments(preInstId);
+}
+
 function updatePayInstallments(preInstId) {
-  const debtId  = parseInt(document.getElementById('pay-debt').value);
-  const instSel = document.getElementById('pay-inst');
-  const pending = installments.filter(i => i.debtId===debtId && !i.paid).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const debtId   = parseInt(document.getElementById('pay-debt').value);
+  const rubroVal = document.getElementById('pay-rubro').value;
+  const rubroIdx = rubroVal !== '' ? parseInt(rubroVal) : null;
+  const instSel  = document.getElementById('pay-inst');
+  const pending  = installments
+    .filter(i => i.debtId===debtId && !i.paid && (rubroIdx===null || i.rubroIdx===rubroIdx))
+    .sort((a,b) => instSortKey(a).localeCompare(instSortKey(b)));
   instSel.innerHTML = '<option value="">— Sin vincular —</option>' +
     pending.map(i=>`<option value="${i.id}">${fmtDate(i.dueDate)}${i.description?' · '+i.description:''} (${fmt(i.amount)})</option>`).join('');
   if (preInstId) {
@@ -1041,6 +1079,28 @@ document.getElementById('debt-cats-input').addEventListener('keydown', function(
 document.getElementById('debt-cats-input').addEventListener('blur', function() {
   if (this.value.trim()) { addTag(this.value); this.value=''; }
 });
+
+// ── Rubro helpers ─────────────────────────────────────────
+function rubroName(debtId, rubroIdx) {
+  if (rubroIdx === null || rubroIdx === undefined) return '—';
+  const debt = debts.find(d=>d.id===debtId);
+  return (debt?.rubros || [])[rubroIdx]?.name || '—';
+}
+
+function updateDebtRubroSelect(selectId, fieldId, debtId) {
+  const debt   = debts.find(d=>d.id===debtId);
+  const rubros = debt?.rubros || [];
+  const field  = document.getElementById(fieldId);
+  const sel    = document.getElementById(selectId);
+  if (rubros.length) {
+    sel.innerHTML = '<option value="">— Deuda completa —</option>' +
+      rubros.map((r,i)=>`<option value="${i}">${r.name} (${fmt(r.amount)})</option>`).join('');
+    field.style.display = '';
+  } else {
+    field.style.display = 'none';
+    sel.value = '';
+  }
+}
 
 // ── Rubros ────────────────────────────────────────────────
 function addRubroRow(name='', amount='') {
@@ -1109,15 +1169,17 @@ function addDebt() {
 }
 
 function addInstallments() {
-  const debtId = parseInt(document.getElementById('inst-debt').value);
+  const debtId   = parseInt(document.getElementById('inst-debt').value);
   if (!debtId) return;
+  const rubroVal = document.getElementById('inst-rubro').value;
+  const rubroIdx = rubroVal !== '' ? parseInt(rubroVal) : null;
   const type = document.querySelector('input[name="inst-type"]:checked').value;
   if (type === 'single') {
     const dueDate     = document.getElementById('inst-date').value;
     const amount      = parseFloat(document.getElementById('inst-amount').value) || 0;
     const description = document.getElementById('inst-desc').value.trim();
     if (!dueDate || !amount) return;
-    installments.push({ id:nextId++, debtId, dueDate, amount, description, paid:false });
+    installments.push({ id:nextId++, debtId, rubroIdx, dueDate, amount, description, paid:false });
   } else {
     const startDate = document.getElementById('inst-start-date').value;
     const amount    = parseFloat(document.getElementById('inst-monthly-amount').value) || 0;
@@ -1127,7 +1189,7 @@ function addInstallments() {
     for (let i=0; i<num; i++) {
       const d = new Date(base);
       d.setMonth(d.getMonth() + i);
-      installments.push({ id:nextId++, debtId, dueDate:d.toISOString().slice(0,10), amount, description:`Cuota ${i+1}`, paid:false });
+      installments.push({ id:nextId++, debtId, rubroIdx, dueDate:d.toISOString().slice(0,10), amount, description:`Cuota ${i+1}`, paid:false });
     }
   }
   closeModal('modal-installment');
@@ -1141,8 +1203,10 @@ function addPayment() {
   const date          = document.getElementById('pay-date').value;
   const type          = document.querySelector('input[name="pay-type"]:checked').value;
   const otherDesc     = document.getElementById('pay-other-desc').value.trim();
+  const rubroVal      = document.getElementById('pay-rubro').value;
+  const rubroIdx      = rubroVal !== '' ? parseInt(rubroVal) : null;
   if (!debtId || !amount || !date) return;
-  payments.push({ id:nextId++, debtId, installmentId, amount, date, type, otherDesc });
+  payments.push({ id:nextId++, debtId, installmentId, rubroIdx, amount, date, type, otherDesc });
   if (installmentId) {
     const inst = installments.find(i=>i.id===installmentId);
     if (inst) inst.paid = true;
