@@ -671,7 +671,12 @@ function renderDebtors() {
       <div class="debtor-header" onclick="toggleDebtor(${debtor.id})">
         <div>
           <div class="debtor-name">${debtor.name}</div>
-          <div class="debtor-meta">${dDebts.length} deuda${dDebts.length !== 1 ? 's' : ''} · Total: ${fmt(totalD)} · Pagado: ${fmt(paidD)}</div>
+          <div class="debtor-meta">
+            ${dDebts.length} deuda${dDebts.length !== 1 ? 's' : ''} &nbsp;·&nbsp;
+            Total: <span style="color:#ff5c5c;font-weight:600">${fmt(totalD)}</span> &nbsp;·&nbsp;
+            Pagado: <span style="color:#5cffa0;font-weight:600">${fmt(paidD)}</span> &nbsp;·&nbsp;
+            Saldo: <span style="color:#ffb347;font-weight:600">${fmt(totalD - paidD)}</span>
+          </div>
         </div>
         <div class="debtor-actions">
           <button class="btn sm" onclick="event.stopPropagation();openAddDebtModal(${debtor.id})">+ Deuda</button>
