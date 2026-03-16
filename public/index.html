@@ -468,7 +468,7 @@
       <label>Rubro <span class="hint">(opcional)</span></label>
       <select id="pay-rubro" onchange="updatePayInstallments()"></select>
     </div>
-    <div class="field">
+    <div class="field" id="pay-inst-field">
       <label>Vincular a cuota <span class="hint">(opcional)</span></label>
       <select id="pay-inst" onchange="prefillInstAmount()"><option value="">— Sin vincular —</option></select>
     </div>
@@ -1078,6 +1078,8 @@ function openPaymentModal(preDebtId, preInstId) {
   document.querySelector('input[name="pay-type"][value="transfer"]').checked = true;
   document.querySelectorAll('#pay-type-group .radio-opt').forEach(el=>el.classList.remove('selected'));
   document.getElementById('rl-transfer').classList.add('selected');
+  // Ocultar selector de cuota si viene previnculado desde una fila
+  document.getElementById('pay-inst-field').style.display = preInstId ? 'none' : '';
   updatePayDebt(preInstId);
   openModal('modal-payment');
 }
