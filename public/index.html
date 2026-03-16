@@ -520,6 +520,7 @@
       </div>
     </div>
     <div class="modal-actions" style="margin-top:1rem">
+      <button class="btn" id="ev-dl-all-btn" style="display:none" onclick="downloadAllEvidence()">⬇ Descargar todo</button>
       <button class="btn" onclick="closeModal('modal-evidence')">Cerrar</button>
     </div>
   </div>
@@ -874,11 +875,13 @@ function renderPaymentsTable() {
       <td class="mono">${fmt(p.amount)}</td>
       <td style="color:var(--text2);font-size:12px">${payTypeName(p.type, p.otherDesc)}</td>
       <td style="color:var(--text2);font-size:12px">${inst ? fmtDate(inst.dueDate) + (inst.description ? ' · ' + inst.description : '') : '—'}</td>
-      <td style="display:flex;align-items:center;gap:6px">
-        ${evCount ? `<span class="ev-badge" onclick="openEvidenceModal(${p.id})">📎 ${evCount}</span>` : ''}
-        <button class="btn sm" style="font-size:11px;padding:3px 8px" onclick="openEvidenceModal(${p.id})">${evCount ? '+ Agregar' : '📎 Agregar'}</button>
+      <td>
+        ${evCount ? `<span class="ev-badge" onclick="openEvidenceModal(${p.id})">📎 ${evCount}</span>` : '<span style="color:var(--text3);font-size:12px">—</span>'}
       </td>
-      <td><button class="btn icon danger" onclick="deletePayment(${p.id})">✕</button></td>
+      <td style="display:flex;gap:4px">
+        <button class="btn icon" title="Agregar evidencia" onclick="openEvidenceModal(${p.id})">📎</button>
+        <button class="btn icon danger" onclick="deletePayment(${p.id})">✕</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1429,8 +1432,10 @@ async function openEvidenceModal(payId) {
 async function refreshEvidenceList(pay) {
   if (!pay) pay = payments.find(p => p.id === _evidencePayId);
   const list = document.getElementById('ev-list');
+  const dlAllBtn = document.getElementById('ev-dl-all-btn');
   if (!(pay.evidence||[]).length) {
     list.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0">Sin evidencias aún. Agrega archivos abajo.</div>';
+    if (dlAllBtn) dlAllBtn.style.display = 'none';
     return;
   }
   list.innerHTML = '<div style="color:var(--text3);font-size:13px">Cargando…</div>';
@@ -1449,10 +1454,11 @@ async function refreshEvidenceList(pay) {
         <div class="ev-item-size">${fmtSize(ev.size)}</div>
       </div>
       <div class="ev-item-actions">
-        ${url ? `<button class="btn sm" onclick="downloadEvidence('${ev.id}','${ev.name.replace(/'/g,"\\'")}','${ev.type}')">Descargar</button>` : '<span style="font-size:11px;color:var(--danger)">No disponible</span>'}
+        ${url ? `<button class="btn sm" onclick="downloadEvidence('${ev.id}','${ev.name.replace(/'/g,"\\'")}','${ev.type}')">⬇</button>` : '<span style="font-size:11px;color:var(--danger)">No disponible</span>'}
         <button class="btn sm danger" onclick="removeEvidenceFromPayment('${ev.id}')">✕</button>
       </div>
     </div>`).join('');
+  if (dlAllBtn) dlAllBtn.style.display = pay.evidence.length > 1 ? 'inline-flex' : 'none';
 }
 
 async function addEvidenceToPayment(files) {
@@ -1488,6 +1494,22 @@ async function downloadEvidence(evId, name, type) {
   const a    = document.createElement('a');
   a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function downloadAllEvidence() {
+  const pay = payments.find(p => p.id === _evidencePayId);
+  if (!pay || !(pay.evidence||[]).length) return;
+  for (let i = 0; i < pay.evidence.length; i++) {
+    const ev = pay.evidence[i];
+    const blob = await dbGet(ev.id).catch(() => null);
+    if (!blob) continue;
+    const file = blob instanceof Blob ? blob : new Blob([blob], { type: ev.type });
+    const url  = URL.createObjectURL(file);
+    const a    = document.createElement('a');
+    a.href = url; a.download = ev.name; a.click();
+    await new Promise(r => setTimeout(r, 300));
+    URL.revokeObjectURL(url);
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────
