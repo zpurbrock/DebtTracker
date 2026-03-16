@@ -689,9 +689,16 @@ function renderPlanFilters() {
     ).join('');
 }
 
+function instSortKey(inst) {
+  // Sort by debt, then by numeric part of description ("Cuota 3" → 3), then by dueDate
+  const numMatch = (inst.description || '').match(/(\d+)/);
+  const num = numMatch ? parseInt(numMatch[1]) : Infinity;
+  return `${String(inst.debtId).padStart(10,'0')}_${String(num).padStart(8,'0')}_${inst.dueDate}`;
+}
+
 function renderPlan() {
   const tbody = document.getElementById('plan-body');
-  let rows = [...installments].sort((a,b) => a.dueDate.localeCompare(b.dueDate));
+  let rows = [...installments].sort((a,b) => instSortKey(a).localeCompare(instSortKey(b)));
   if (filterPlan !== 'all') {
     const debtIds = debts.filter(d => d.debtorId === filterPlan).map(d => d.id);
     rows = rows.filter(i => debtIds.includes(i.debtId));
@@ -700,12 +707,40 @@ function renderPlan() {
     tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Sin cuotas programadas</td></tr>';
     return;
   }
+
+  // Calculate unplanned balance per debt
+  const debtIds = [...new Set(rows.map(i => i.debtId))];
+  const unplanned = {};
+  debtIds.forEach(did => {
+    const debt = debts.find(d => d.id === did);
+    if (!debt) return;
+    const allInst = installments.filter(i => i.debtId === did);
+    const planned = allInst.reduce((s,i) => s + i.amount, 0);
+    const gap = debt.total - planned;
+    if (gap > 0.01) unplanned[did] = gap;
+  });
+
   const labels = { paid:'Pagado', pending:'Pendiente', overdue:'Vencido', upcoming:'Por vencer' };
-  tbody.innerHTML = rows.map(inst => {
+  let html = '';
+  let lastDebtId = null;
+
+  rows.forEach(inst => {
     const debt   = debts.find(d => d.id === inst.debtId);
     const debtor = debt ? debtors.find(d => d.id === debt.debtorId) : null;
     const st     = instStatus(inst);
-    return `<tr class="${st === 'overdue' ? 'row-overdue' : st === 'upcoming' ? 'row-upcoming' : ''}">
+
+    // Insert unplanned warning row when switching to a new debt that has a gap
+    if (inst.debtId !== lastDebtId && unplanned[inst.debtId]) {
+      html += `<tr style="background:rgba(255,92,92,0.06)">
+        <td colspan="5" style="color:var(--danger);font-size:12px;padding:8px 14px">
+          ⚠ ${debt ? debt.name : ''} — faltan por planificar <strong>${fmt(unplanned[inst.debtId])}</strong> para cubrir el saldo total
+        </td>
+        <td colspan="2"></td>
+      </tr>`;
+    }
+    lastDebtId = inst.debtId;
+
+    html += `<tr class="${st === 'overdue' ? 'row-overdue' : st === 'upcoming' ? 'row-upcoming' : ''}">
       <td class="mono">${fmtDate(inst.dueDate)}</td>
       <td>${debtor ? debtor.name : '—'}</td>
       <td>${debt ? debt.name : '—'}</td>
@@ -717,7 +752,9 @@ function renderPlan() {
         <button class="btn sm danger" onclick="deleteInstallment(${inst.id})">✕</button>
       </td>
     </tr>`;
-  }).join('');
+  });
+
+  tbody.innerHTML = html;
 }
 
 // ── Payments table ────────────────────────────────────────
