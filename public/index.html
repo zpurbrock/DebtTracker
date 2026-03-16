@@ -536,24 +536,32 @@ const PAL = {
   purple: { bar:'#b57bff', light:'rgba(181,123,255,0.25)', pill:'background:rgba(181,123,255,0.15);color:#b57bff' },
 };
 
-let lenders      = JSON.parse(localStorage.getItem('dt2-lenders')      || '[]');
-let debtors      = JSON.parse(localStorage.getItem('dt2-debtors')      || '[]');
-let debts        = JSON.parse(localStorage.getItem('dt2-debts')        || '[]');
-let installments = JSON.parse(localStorage.getItem('dt2-installments') || '[]');
-let payments     = JSON.parse(localStorage.getItem('dt2-payments')     || '[]');
-let nextId       = JSON.parse(localStorage.getItem('dt2-nextid')       || '1');
+let lenders      = [];
+let debtors      = [];
+let debts        = [];
+let installments = [];
+let payments     = [];
 let filterPlan   = 'all';
 let filterPay    = 'all';
 let chartView    = 'lender';
 let charts       = {};
 
-function save() {
-  localStorage.setItem('dt2-lenders',      JSON.stringify(lenders));
-  localStorage.setItem('dt2-debtors',      JSON.stringify(debtors));
-  localStorage.setItem('dt2-debts',        JSON.stringify(debts));
-  localStorage.setItem('dt2-installments', JSON.stringify(installments));
-  localStorage.setItem('dt2-payments',     JSON.stringify(payments));
-  localStorage.setItem('dt2-nextid',       JSON.stringify(nextId));
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(path, opts);
+  if (!r.ok) { const msg = await r.text(); throw new Error(msg); }
+  return r.json();
+}
+
+async function loadData() {
+  [lenders, debtors, debts, installments, payments] = await Promise.all([
+    api('GET', '/api/lenders'),
+    api('GET', '/api/debtors'),
+    api('GET', '/api/debts'),
+    api('GET', '/api/installments'),
+    api('GET', '/api/payments'),
+  ]);
 }
 
 const fmt  = n => '$' + Math.round(n).toLocaleString('es-MX');
@@ -611,7 +619,6 @@ function render() {
   renderPayFilters();
   renderPaymentsTable();
   renderCharts();
-  save();
 }
 
 // ── Alerts ────────────────────────────────────────────────
@@ -1212,18 +1219,21 @@ function getRubros() {
 }
 
 // ── CRUD ──────────────────────────────────────────────────
-function addDebtor() {
+async function addDebtor() {
   const name = document.getElementById('debtor-name').value.trim();
   if (!name) return;
   const err = document.getElementById('debtor-err');
   if (debtors.some(d=>d.name.toLowerCase()===name.toLowerCase())) { err.classList.add('visible'); return; }
   err.classList.remove('visible');
-  debtors.push({ id:nextId++, name });
-  closeModal('modal-debtor');
-  render();
+  try {
+    const d = await api('POST', '/api/debtors', { name });
+    debtors.push(d);
+    closeModal('modal-debtor');
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-function addDebt() {
+async function addDebt() {
   const debtorId   = parseInt(document.getElementById('debt-debtor').value);
   const name       = document.getElementById('debt-name').value.trim();
   const total      = parseFloat(document.getElementById('debt-total').value) || 0;
@@ -1232,23 +1242,27 @@ function addDebt() {
   const lenderId   = parseInt(document.getElementById('debt-lender').value) || null;
   const rubros     = getRubros();
   if (!debtorId || !name) return;
-  debts.push({ id:nextId++, debtorId, lenderId, name, total, categories, color, rubros });
-  closeModal('modal-debt');
-  render();
+  try {
+    const d = await api('POST', '/api/debts', { debtorId, lenderId, name, total, categories, rubros, color });
+    debts.push(d);
+    closeModal('modal-debt');
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-function addInstallments() {
+async function addInstallments() {
   const debtId   = parseInt(document.getElementById('inst-debt').value);
   if (!debtId) return;
   const rubroVal = document.getElementById('inst-rubro').value;
   const rubroIdx = rubroVal !== '' ? parseInt(rubroVal) : null;
   const type = document.querySelector('input[name="inst-type"]:checked').value;
+  const newInsts = [];
   if (type === 'single') {
     const dueDate     = document.getElementById('inst-date').value;
     const amount      = parseFloat(document.getElementById('inst-amount').value) || 0;
     const description = document.getElementById('inst-desc').value.trim();
     if (!dueDate || !amount) return;
-    installments.push({ id:nextId++, debtId, rubroIdx, dueDate, amount, description, paid:false });
+    newInsts.push({ debtId, rubroIdx, dueDate, amount, description, paid: false });
   } else {
     const startDate = document.getElementById('inst-start-date').value;
     const amount    = parseFloat(document.getElementById('inst-monthly-amount').value) || 0;
@@ -1258,11 +1272,17 @@ function addInstallments() {
     for (let i=0; i<num; i++) {
       const d = new Date(base);
       d.setMonth(d.getMonth() + i);
-      installments.push({ id:nextId++, debtId, rubroIdx, dueDate:d.toISOString().slice(0,10), amount, description:`Cuota ${i+1}`, paid:false });
+      newInsts.push({ debtId, rubroIdx, dueDate: d.toISOString().slice(0,10), amount, description: `Cuota ${i+1}`, paid: false });
     }
   }
-  closeModal('modal-installment');
-  render();
+  try {
+    for (const inst of newInsts) {
+      const saved = await api('POST', '/api/installments', inst);
+      installments.push(saved);
+    }
+    closeModal('modal-installment');
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 async function addPayment() {
@@ -1274,101 +1294,112 @@ async function addPayment() {
   const otherDesc     = document.getElementById('pay-other-desc').value.trim();
   const rubroVal      = document.getElementById('pay-rubro').value;
   const rubroIdx      = rubroVal !== '' ? parseInt(rubroVal) : null;
+  const debt          = debts.find(d => d.id === debtId);
+  const debtorId      = debt ? debt.debtorId : null;
   if (!debtId || !amount || !date) return;
-  const payment = { id:nextId++, debtId, installmentId, rubroIdx, amount, date, type, otherDesc, evidence:[] };
-  if (pendingEvidence.length) {
+  try {
+    const payment = await api('POST', '/api/payments', { debtId, debtorId, installmentId, rubroIdx, amount, date, type, otherDesc });
     for (const e of pendingEvidence) {
-      const evId = 'ev_' + nextId++;
-      await dbPut(evId, e.file);
-      payment.evidence.push({ id:evId, name:e.name, type:e.type, size:e.size });
+      const fd = new FormData();
+      fd.append('file', e.file);
+      fd.append('paymentId', payment.id);
+      const r = await fetch('/api/evidence', { method: 'POST', body: fd });
+      if (r.ok) payment.evidence.push(await r.json());
     }
-  }
-  payments.push(payment);
-  if (installmentId) {
-    const inst = installments.find(i=>i.id===installmentId);
-    if (inst) inst.paid = true;
-  }
-  clearEvidenceInput();
-  closeModal('modal-payment');
-  render();
+    payments.push(payment);
+    if (installmentId) {
+      const inst = installments.find(i=>i.id===installmentId);
+      if (inst) inst.paid = true;
+    }
+    clearEvidenceInput();
+    closeModal('modal-payment');
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-function addLender() {
+async function addLender() {
   const name = document.getElementById('lender-name').value.trim();
   if (!name) return;
   const err = document.getElementById('lender-err');
   if (lenders.some(l=>l.name.toLowerCase()===name.toLowerCase())) { err.classList.add('visible'); return; }
   err.classList.remove('visible');
-  lenders.push({ id:nextId++, name });
-  closeModal('modal-lender');
-  render();
+  try {
+    const l = await api('POST', '/api/lenders', { name });
+    lenders.push(l);
+    closeModal('modal-lender');
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-function deleteLender(id) {
+async function deleteLender(id) {
   if (!confirm('¿Eliminar este prestamista? Las deudas asociadas quedarán sin prestamista.')) return;
-  lenders = lenders.filter(l=>l.id!==id);
-  debts = debts.map(d => d.lenderId===id ? { ...d, lenderId:null } : d);
-  render();
+  try {
+    await api('DELETE', `/api/lenders/${id}`);
+    lenders = lenders.filter(l=>l.id!==id);
+    debts = debts.map(d => d.lenderId===id ? { ...d, lenderId:null } : d);
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-function deleteDebtor(id) {
+async function deleteDebtor(id) {
   if (!confirm('¿Eliminar este deudor y todas sus deudas, cuotas y pagos?')) return;
-  const debtIds = debts.filter(d=>d.debtorId===id).map(d=>d.id);
-  debtors      = debtors.filter(d=>d.id!==id);
-  debts        = debts.filter(d=>d.debtorId!==id);
-  installments = installments.filter(i=>!debtIds.includes(i.debtId));
-  payments     = payments.filter(p=>!debtIds.includes(p.debtId));
-  if (filterPlan === id) filterPlan = 'all';
-  if (filterPay  === id) filterPay  = 'all';
-  render();
+  try {
+    const debtIds = debts.filter(d=>d.debtorId===id).map(d=>d.id);
+    await api('DELETE', `/api/debtors/${id}`);
+    debtors      = debtors.filter(d=>d.id!==id);
+    debts        = debts.filter(d=>d.debtorId!==id);
+    installments = installments.filter(i=>!debtIds.includes(i.debtId));
+    payments     = payments.filter(p=>!debtIds.includes(p.debtId));
+    if (filterPlan === id) filterPlan = 'all';
+    if (filterPay  === id) filterPay  = 'all';
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-function deleteDebt(id) {
+async function deleteDebt(id) {
   if (!confirm('¿Eliminar esta deuda y sus cuotas/pagos asociados?')) return;
-  debts        = debts.filter(d=>d.id!==id);
-  installments = installments.filter(i=>i.debtId!==id);
-  payments     = payments.filter(p=>p.debtId!==id);
-  render();
+  try {
+    await api('DELETE', `/api/debts/${id}`);
+    debts        = debts.filter(d=>d.id!==id);
+    installments = installments.filter(i=>i.debtId!==id);
+    payments     = payments.filter(p=>p.debtId!==id);
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-function deletePlan(debtId) {
+async function deletePlan(debtId) {
   const debt  = debts.find(d=>d.id===debtId);
   const count = installments.filter(i=>i.debtId===debtId).length;
   if (!confirm(`¿Eliminar el plan completo de "${debt?.name}" (${count} cuota${count!==1?'s':''})? Los pagos registrados no se eliminarán.`)) return;
-  installments = installments.filter(i=>i.debtId!==debtId);
-  render();
+  try {
+    await api('DELETE', `/api/debts/${debtId}/plan`);
+    installments = installments.filter(i=>i.debtId!==debtId);
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-function deleteInstallment(id) {
-  installments = installments.filter(i=>i.id!==id);
-  render();
+async function deleteInstallment(id) {
+  try {
+    await api('DELETE', `/api/installments/${id}`);
+    installments = installments.filter(i=>i.id!==id);
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-function deletePayment(id) {
-  const pay = payments.find(p=>p.id===id);
-  if (pay?.installmentId) {
-    const inst = installments.find(i=>i.id===pay.installmentId);
-    if (inst) inst.paid = false;
-  }
-  (pay?.evidence||[]).forEach(ev => dbDel(ev.id));
-  payments = payments.filter(p=>p.id!==id);
-  render();
+async function deletePayment(id) {
+  try {
+    await api('DELETE', `/api/payments/${id}`);
+    const pay = payments.find(p=>p.id===id);
+    if (pay?.installmentId) {
+      const inst = installments.find(i=>i.id===pay.installmentId);
+      if (inst) inst.paid = false;
+    }
+    payments = payments.filter(p=>p.id!==id);
+    render();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-// ── IndexedDB (file storage) ──────────────────────────────
-let _db = null;
-function openDB() {
-  if (_db) return Promise.resolve(_db);
-  return new Promise((res, rej) => {
-    const req = indexedDB.open('DebtTrackerFiles', 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore('files');
-    req.onsuccess = e => { _db = e.target.result; res(_db); };
-    req.onerror   = rej;
-  });
-}
-function dbPut(id, blob)  { return openDB().then(db => new Promise((res,rej) => { const tx=db.transaction('files','readwrite'); tx.objectStore('files').put(blob,id); tx.oncomplete=res; tx.onerror=rej; })); }
-function dbGet(id)        { return openDB().then(db => new Promise((res,rej) => { const tx=db.transaction('files','readonly'); const r=tx.objectStore('files').get(id); r.onsuccess=e=>res(e.target.result); r.onerror=rej; })); }
-function dbDel(id)        { return openDB().then(db => new Promise((res) => { const tx=db.transaction('files','readwrite'); tx.objectStore('files').delete(id); tx.oncomplete=res; })); }
+// ── Evidence storage via API ──────────────────────────────
 
 // ── Evidence UI helpers ───────────────────────────────────
 let pendingEvidence = []; // [{file, previewUrl, tempId}]
@@ -1438,24 +1469,18 @@ async function refreshEvidenceList(pay) {
     if (dlAllBtn) dlAllBtn.style.display = 'none';
     return;
   }
-  list.innerHTML = '<div style="color:var(--text3);font-size:13px">Cargando…</div>';
-  const items = await Promise.all(pay.evidence.map(async ev => {
-    const blob = await dbGet(ev.id).catch(() => null);
-    const url  = blob ? URL.createObjectURL(blob) : null;
-    return { ev, blob, url };
-  }));
-  list.innerHTML = items.map(({ ev, url }) => `
+  list.innerHTML = pay.evidence.map(ev => `
     <div class="ev-item">
-      ${ev.type.startsWith('image/') && url
-        ? `<img src="${url}" alt="${ev.name}" />`
+      ${ev.type.startsWith('image/')
+        ? `<img src="/api/evidence/${ev.id}" alt="${ev.name}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0" />`
         : `<div class="ev-icon">${fileIcon(ev.type)}</div>`}
       <div class="ev-item-info">
         <div class="ev-item-name">${ev.name}</div>
         <div class="ev-item-size">${fmtSize(ev.size)}</div>
       </div>
       <div class="ev-item-actions">
-        ${url ? `<button class="btn sm" onclick="downloadEvidence('${ev.id}','${ev.name.replace(/'/g,"\\'")}','${ev.type}')">⬇</button>` : '<span style="font-size:11px;color:var(--danger)">No disponible</span>'}
-        <button class="btn sm danger" onclick="removeEvidenceFromPayment('${ev.id}')">✕</button>
+        <button class="btn sm" onclick="downloadEvidence(${ev.id},'${ev.name.replace(/'/g,"\\'")}')">⬇</button>
+        <button class="btn sm danger" onclick="removeEvidenceFromPayment(${ev.id})">✕</button>
       </div>
     </div>`).join('');
   if (dlAllBtn) dlAllBtn.style.display = pay.evidence.length > 1 ? 'inline-flex' : 'none';
@@ -1466,12 +1491,13 @@ async function addEvidenceToPayment(files) {
   if (!pay || !files.length) return;
   if (!pay.evidence) pay.evidence = [];
   for (const file of files) {
-    const evId = 'ev_' + nextId++;
-    await dbPut(evId, file);
-    pay.evidence.push({ id:evId, name:file.name, type:file.type, size:file.size });
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('paymentId', pay.id);
+    const r = await fetch('/api/evidence', { method: 'POST', body: fd });
+    if (r.ok) pay.evidence.push(await r.json());
   }
   document.getElementById('ev-add-input').value = '';
-  save();
   render();
   await refreshEvidenceList(pay);
 }
@@ -1479,21 +1505,19 @@ async function addEvidenceToPayment(files) {
 async function removeEvidenceFromPayment(evId) {
   const pay = payments.find(p => p.id === _evidencePayId);
   if (!pay) return;
-  await dbDel(evId);
-  pay.evidence = (pay.evidence||[]).filter(e => e.id !== evId);
-  save();
-  render();
-  await refreshEvidenceList(pay);
+  try {
+    await api('DELETE', `/api/evidence/${evId}`);
+    pay.evidence = (pay.evidence||[]).filter(e => e.id !== evId);
+    render();
+    await refreshEvidenceList(pay);
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-async function downloadEvidence(evId, name, type) {
-  const blob = await dbGet(evId);
-  if (!blob) return alert('Archivo no encontrado.');
-  const file = blob instanceof Blob ? blob : new Blob([blob], { type });
-  const url  = URL.createObjectURL(file);
-  const a    = document.createElement('a');
-  a.href = url; a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+function downloadEvidence(evId, name) {
+  const a = document.createElement('a');
+  a.href = `/api/evidence/${evId}?download=1`;
+  a.download = name;
+  a.click();
 }
 
 async function downloadAllEvidence() {
@@ -1501,19 +1525,16 @@ async function downloadAllEvidence() {
   if (!pay || !(pay.evidence||[]).length) return;
   for (let i = 0; i < pay.evidence.length; i++) {
     const ev = pay.evidence[i];
-    const blob = await dbGet(ev.id).catch(() => null);
-    if (!blob) continue;
-    const file = blob instanceof Blob ? blob : new Blob([blob], { type: ev.type });
-    const url  = URL.createObjectURL(file);
-    const a    = document.createElement('a');
-    a.href = url; a.download = ev.name; a.click();
+    const a = document.createElement('a');
+    a.href = `/api/evidence/${ev.id}?download=1`;
+    a.download = ev.name;
+    a.click();
     await new Promise(r => setTimeout(r, 300));
-    URL.revokeObjectURL(url);
   }
 }
 
 // ── Init ──────────────────────────────────────────────────
-render();
+loadData().then(() => render()).catch(e => console.error('Error cargando datos:', e));
 </script>
 </body>
 </html>
