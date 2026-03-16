@@ -166,6 +166,27 @@
     .dc-rubro-row { display:flex; justify-content:space-between; font-size:11px; color:var(--text2); padding:2px 0; }
     .dc-rubro-row span { font-family:'DM Mono',monospace; color:var(--text); font-size:11px; }
 
+    /* Evidence */
+    .ev-drop { border:1px dashed var(--border2); border-radius:var(--radius-sm); padding:16px; text-align:center; cursor:pointer; transition:all 0.15s; color:var(--text3); font-size:13px; }
+    .ev-drop:hover, .ev-drop.drag-over { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+    .ev-drop input[type=file] { display:none; }
+    .ev-preview { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .ev-thumb { position:relative; width:72px; }
+    .ev-thumb img { width:72px; height:72px; object-fit:cover; border-radius:6px; border:1px solid var(--border2); display:block; }
+    .ev-thumb .ev-doc { width:72px; height:72px; border-radius:6px; border:1px solid var(--border2); background:var(--surface2); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:10px; color:var(--text2); text-align:center; padding:4px; }
+    .ev-thumb .ev-doc span { font-size:22px; }
+    .ev-thumb .ev-remove { position:absolute; top:-5px; right:-5px; background:var(--danger); color:#fff; border:none; border-radius:50%; width:16px; height:16px; font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .ev-badge { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:500; padding:2px 8px; border-radius:99px; background:rgba(90,180,255,0.12); color:#5ab4ff; cursor:pointer; }
+    .ev-badge:hover { background:rgba(90,180,255,0.22); }
+    .ev-list { display:flex; flex-direction:column; gap:8px; }
+    .ev-item { display:flex; align-items:center; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 12px; }
+    .ev-item img { width:48px; height:48px; object-fit:cover; border-radius:4px; flex-shrink:0; }
+    .ev-item .ev-icon { width:48px; height:48px; border-radius:4px; background:var(--surface); display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; }
+    .ev-item-info { flex:1; overflow:hidden; }
+    .ev-item-name { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ev-item-size { font-size:11px; color:var(--text3); margin-top:2px; }
+    .ev-item-actions { display:flex; gap:6px; flex-shrink:0; }
+
     /* Responsive */
     @media (max-width:768px) {
       .metrics { grid-template-columns:repeat(2,1fr); }
@@ -303,7 +324,7 @@
       <thead>
         <tr>
           <th>Fecha</th><th>Deudor</th><th>Deuda</th><th>Rubro</th>
-          <th>Monto</th><th>Tipo de pago</th><th>Cuota</th><th></th>
+          <th>Monto</th><th>Tipo de pago</th><th>Cuota</th><th>Evidencia</th><th></th>
         </tr>
       </thead>
       <tbody id="payments-body"></tbody>
@@ -465,9 +486,31 @@
       <label>Especificar medio de pago</label>
       <input type="text" id="pay-other-desc" placeholder="Ej: Cheque, depósito..." />
     </div>
+    <div class="field">
+      <label>Evidencia <span class="hint">(imágenes, PDF, documentos — opcional)</span></label>
+      <div class="ev-drop" id="ev-drop" onclick="document.getElementById('pay-evidence').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="event.preventDefault();this.classList.remove('drag-over');handleEvidenceDrop(event.dataTransfer.files)">
+        <input type="file" id="pay-evidence" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" onchange="handleEvidenceDrop(this.files)" />
+        Haz click o arrastra archivos aquí
+      </div>
+      <div class="ev-preview" id="ev-preview"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-payment')">Cancelar</button>
       <button class="btn primary" onclick="addPayment()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Ver evidencia -->
+<div id="modal-evidence" class="modal-bg">
+  <div class="modal" style="max-width:500px">
+    <h2>Evidencia de pago</h2>
+    <div class="ev-list" id="ev-list"></div>
+    <div class="modal-actions" style="margin-top:1rem">
+      <button class="btn" onclick="closeModal('modal-evidence')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -803,7 +846,7 @@ function renderPaymentsTable() {
     rows = rows.filter(p => debtIds.includes(p.debtId));
   }
   if (!rows.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Sin pagos registrados</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Sin pagos registrados</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(p => {
@@ -811,6 +854,7 @@ function renderPaymentsTable() {
     const debtor = debt ? debtors.find(d => d.id === debt.debtorId) : null;
     const inst   = p.installmentId ? installments.find(i => i.id === p.installmentId) : null;
     const rubro  = p.rubroIdx !== null && p.rubroIdx !== undefined ? rubroName(p.debtId, p.rubroIdx) : '—';
+    const evCount = (p.evidence||[]).length;
     return `<tr>
       <td class="mono">${fmtDate(p.date)}</td>
       <td>${debtor ? debtor.name : '—'}</td>
@@ -819,6 +863,7 @@ function renderPaymentsTable() {
       <td class="mono">${fmt(p.amount)}</td>
       <td style="color:var(--text2);font-size:12px">${payTypeName(p.type, p.otherDesc)}</td>
       <td style="color:var(--text2);font-size:12px">${inst ? fmtDate(inst.dueDate) + (inst.description ? ' · ' + inst.description : '') : '—'}</td>
+      <td>${evCount ? `<span class="ev-badge" onclick="openEvidenceModal(${p.id})">📎 ${evCount}</span>` : '<span style="color:var(--text3);font-size:12px">—</span>'}</td>
       <td><button class="btn icon danger" onclick="deletePayment(${p.id})">✕</button></td>
     </tr>`;
   }).join('');
@@ -1005,6 +1050,7 @@ function openPaymentModal(preDebtId, preInstId) {
   document.getElementById('pay-amount').value = '';
   document.getElementById('pay-other-desc').value = '';
   document.getElementById('pay-other-field').style.display = 'none';
+  clearEvidenceInput();
   document.querySelector('input[name="pay-type"][value="transfer"]').checked = true;
   document.querySelectorAll('#pay-type-group .radio-opt').forEach(el=>el.classList.remove('selected'));
   document.getElementById('rl-transfer').classList.add('selected');
@@ -1202,7 +1248,7 @@ function addInstallments() {
   render();
 }
 
-function addPayment() {
+async function addPayment() {
   const debtId        = parseInt(document.getElementById('pay-debt').value);
   const installmentId = parseInt(document.getElementById('pay-inst').value) || null;
   const amount        = parseFloat(document.getElementById('pay-amount').value) || 0;
@@ -1212,11 +1258,20 @@ function addPayment() {
   const rubroVal      = document.getElementById('pay-rubro').value;
   const rubroIdx      = rubroVal !== '' ? parseInt(rubroVal) : null;
   if (!debtId || !amount || !date) return;
-  payments.push({ id:nextId++, debtId, installmentId, rubroIdx, amount, date, type, otherDesc });
+  const payment = { id:nextId++, debtId, installmentId, rubroIdx, amount, date, type, otherDesc, evidence:[] };
+  if (pendingEvidence.length) {
+    for (const e of pendingEvidence) {
+      const evId = 'ev_' + nextId++;
+      await dbPut(evId, e.file);
+      payment.evidence.push({ id:evId, name:e.name, type:e.type, size:e.size });
+    }
+  }
+  payments.push(payment);
   if (installmentId) {
     const inst = installments.find(i=>i.id===installmentId);
     if (inst) inst.paid = true;
   }
+  clearEvidenceInput();
   closeModal('modal-payment');
   render();
 }
@@ -1278,8 +1333,108 @@ function deletePayment(id) {
     const inst = installments.find(i=>i.id===pay.installmentId);
     if (inst) inst.paid = false;
   }
+  (pay?.evidence||[]).forEach(ev => dbDel(ev.id));
   payments = payments.filter(p=>p.id!==id);
   render();
+}
+
+// ── IndexedDB (file storage) ──────────────────────────────
+let _db = null;
+function openDB() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('DebtTrackerFiles', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('files');
+    req.onsuccess = e => { _db = e.target.result; res(_db); };
+    req.onerror   = rej;
+  });
+}
+function dbPut(id, blob)  { return openDB().then(db => new Promise((res,rej) => { const tx=db.transaction('files','readwrite'); tx.objectStore('files').put(blob,id); tx.oncomplete=res; tx.onerror=rej; })); }
+function dbGet(id)        { return openDB().then(db => new Promise((res,rej) => { const tx=db.transaction('files','readonly'); const r=tx.objectStore('files').get(id); r.onsuccess=e=>res(e.target.result); r.onerror=rej; })); }
+function dbDel(id)        { return openDB().then(db => new Promise((res) => { const tx=db.transaction('files','readwrite'); tx.objectStore('files').delete(id); tx.oncomplete=res; })); }
+
+// ── Evidence UI helpers ───────────────────────────────────
+let pendingEvidence = []; // [{file, previewUrl, tempId}]
+
+function fmtSize(b) { return b < 1024*1024 ? (b/1024).toFixed(0)+'KB' : (b/1024/1024).toFixed(1)+'MB'; }
+
+function fileIcon(type) {
+  if (type.startsWith('image/')) return '🖼️';
+  if (type === 'application/pdf') return '📄';
+  if (type.includes('word') || type.includes('document')) return '📝';
+  if (type.includes('sheet') || type.includes('excel')) return '📊';
+  return '📎';
+}
+
+function handleEvidenceDrop(files) {
+  for (const file of files) {
+    const tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const isImg  = file.type.startsWith('image/');
+    const entry  = { file, tempId, name: file.name, type: file.type, size: file.size };
+    if (isImg) entry.previewUrl = URL.createObjectURL(file);
+    pendingEvidence.push(entry);
+  }
+  renderEvidencePreview();
+}
+
+function renderEvidencePreview() {
+  const wrap = document.getElementById('ev-preview');
+  wrap.innerHTML = pendingEvidence.map((e,i) => `
+    <div class="ev-thumb">
+      ${e.previewUrl
+        ? `<img src="${e.previewUrl}" alt="${e.name}" />`
+        : `<div class="ev-doc"><span>${fileIcon(e.type)}</span>${e.name.split('.').pop().toUpperCase()}</div>`}
+      <button class="ev-remove" onclick="removePendingEvidence(${i})" title="Quitar">✕</button>
+    </div>`).join('');
+}
+
+function removePendingEvidence(i) {
+  if (pendingEvidence[i].previewUrl) URL.revokeObjectURL(pendingEvidence[i].previewUrl);
+  pendingEvidence.splice(i, 1);
+  renderEvidencePreview();
+}
+
+function clearEvidenceInput() {
+  pendingEvidence.forEach(e => { if (e.previewUrl) URL.revokeObjectURL(e.previewUrl); });
+  pendingEvidence = [];
+  document.getElementById('ev-preview').innerHTML = '';
+  document.getElementById('pay-evidence').value = '';
+}
+
+async function openEvidenceModal(payId) {
+  const pay = payments.find(p => p.id === payId);
+  if (!pay || !(pay.evidence||[]).length) return;
+  const list = document.getElementById('ev-list');
+  list.innerHTML = '<div style="color:var(--text3);font-size:13px">Cargando…</div>';
+  openModal('modal-evidence');
+  const items = await Promise.all(pay.evidence.map(async ev => {
+    const blob = await dbGet(ev.id).catch(() => null);
+    const url  = blob ? URL.createObjectURL(blob) : null;
+    return { ev, blob, url };
+  }));
+  list.innerHTML = items.map(({ ev, url }) => `
+    <div class="ev-item">
+      ${ev.type.startsWith('image/') && url
+        ? `<img src="${url}" alt="${ev.name}" />`
+        : `<div class="ev-icon">${fileIcon(ev.type)}</div>`}
+      <div class="ev-item-info">
+        <div class="ev-item-name">${ev.name}</div>
+        <div class="ev-item-size">${fmtSize(ev.size)}</div>
+      </div>
+      <div class="ev-item-actions">
+        ${url ? `<button class="btn sm" onclick="downloadEvidence('${ev.id}','${ev.name.replace(/'/g,"\\'")}','${ev.type}')">Descargar</button>` : '<span style="font-size:11px;color:var(--danger)">No disponible</span>'}
+      </div>
+    </div>`).join('');
+}
+
+async function downloadEvidence(evId, name, type) {
+  const blob = await dbGet(evId);
+  if (!blob) return alert('Archivo no encontrado.');
+  const file = blob instanceof Blob ? blob : new Blob([blob], { type });
+  const url  = URL.createObjectURL(file);
+  const a    = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ── Init ──────────────────────────────────────────────────
