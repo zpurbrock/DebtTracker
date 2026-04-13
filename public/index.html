@@ -52,6 +52,23 @@
     .quick-stat { padding:10px 12px; border-radius:10px; background:var(--surface2); border:1px solid var(--border); }
     .quick-stat .label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; }
     .quick-stat .value { font-size:17px; margin-top:4px; font-family:'DM Mono',monospace; }
+    .ops-grid { display:grid; grid-template-columns:1.2fr 0.8fr; gap:12px; margin-bottom:1.5rem; }
+    .ops-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.1rem; }
+    .ops-card h3 { font-size:13px; color:var(--text2); margin-bottom:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; }
+    .ops-list { display:flex; flex-direction:column; gap:8px; }
+    .ops-item { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; border:1px solid var(--border); background:var(--surface2); border-radius:10px; padding:10px 12px; }
+    .ops-item-main { min-width:0; }
+    .ops-item-title { font-size:13px; font-weight:600; }
+    .ops-item-meta { font-size:12px; color:var(--text2); margin-top:3px; }
+    .ops-item-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .ops-empty { color:var(--text3); font-size:13px; padding:8px 0; }
+    .settings-stack { display:flex; flex-direction:column; gap:12px; }
+    .inline-field { display:flex; flex-direction:column; gap:5px; }
+    .inline-field label { font-size:12px; color:var(--text2); }
+    .inline-field input, .inline-field select { width:100%; background:var(--surface2); border:1px solid var(--border2); border-radius:var(--radius-sm); color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; padding:9px 12px; outline:none; }
+    .inline-field input:focus, .inline-field select:focus { border-color:var(--accent); }
+    .settings-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .helper { font-size:12px; color:var(--text3); }
     .ops-bar { display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:1rem; }
     .ops-search { min-width:220px; flex:1; max-width:360px; }
     .ops-search input { width:100%; background:var(--surface); border:1px solid var(--border2); border-radius:999px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; padding:10px 14px; outline:none; }
@@ -210,6 +227,7 @@
     /* Responsive */
     @media (max-width:768px) {
       .hero { grid-template-columns:1fr; }
+      .ops-grid { grid-template-columns:1fr; }
       .metrics { grid-template-columns:repeat(2,1fr); }
       .charts-grid { grid-template-columns:1fr; }
       .chart-card.full { grid-column:1; }
@@ -267,9 +285,9 @@
           <button class="btn" onclick="setWorkspace('payments')">Ver vencimientos</button>
         </div>
       </div>
-      <div class="quick-card">
-        <p>Atajos operativos</p>
-        <div class="quick-grid">
+    <div class="quick-card">
+      <p>Atajos operativos</p>
+      <div class="quick-grid">
           <div class="quick-stat">
             <div class="label">Próximo vencimiento</div>
             <div class="value" id="qs-next-due">—</div>
@@ -285,6 +303,40 @@
           <div class="quick-stat">
             <div class="label">Pagos con evidencia</div>
             <div class="value" id="qs-evidence">0</div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <div class="ops-grid">
+      <div class="ops-card">
+        <h3>Cola de cobranza</h3>
+        <div class="ops-list" id="ops-queue"></div>
+      </div>
+      <div class="ops-card">
+        <h3>Recordatorios</h3>
+        <div class="settings-stack">
+          <div class="inline-field">
+            <label>Ventana de aviso previa</label>
+            <select id="reminder-days" onchange="saveReminderSettings()">
+              <option value="1">1 día</option>
+              <option value="3">3 días</option>
+              <option value="7" selected>7 días</option>
+              <option value="14">14 días</option>
+            </select>
+          </div>
+          <div class="inline-field">
+            <label>Canal sugerido</label>
+            <select id="reminder-channel" onchange="saveReminderSettings()">
+              <option value="whatsapp">WhatsApp</option>
+              <option value="sms">SMS</option>
+              <option value="email">Correo</option>
+            </select>
+          </div>
+          <div class="helper" id="reminder-status">Los avisos se muestran dentro de la app.</div>
+          <div class="settings-actions">
+            <button class="btn" onclick="requestBrowserNotifications()">Activar avisos del navegador</button>
+            <button class="btn" onclick="testReminderNotification()">Probar aviso</button>
           </div>
         </div>
       </div>
@@ -672,6 +724,7 @@ let editingLenderId = null;
 let editingDebtId = null;
 let editingInstallmentId = null;
 let editingPaymentId = null;
+let reminderSettings = { daysBefore: 7, channel: 'whatsapp' };
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -691,6 +744,25 @@ async function loadData() {
   ]);
 }
 
+function loadReminderSettings() {
+  try {
+    const raw = localStorage.getItem('debt-tracker-reminders');
+    if (raw) reminderSettings = { ...reminderSettings, ...JSON.parse(raw) };
+  } catch {}
+  document.getElementById('reminder-days').value = String(reminderSettings.daysBefore);
+  document.getElementById('reminder-channel').value = reminderSettings.channel;
+  updateReminderStatus();
+}
+
+function saveReminderSettings() {
+  reminderSettings.daysBefore = parseInt(document.getElementById('reminder-days').value) || 7;
+  reminderSettings.channel = document.getElementById('reminder-channel').value;
+  localStorage.setItem('debt-tracker-reminders', JSON.stringify(reminderSettings));
+  renderAlerts();
+  renderOperationsQueue();
+  updateReminderStatus();
+}
+
 const fmt  = n => '$' + Math.round(n).toLocaleString('es-MX');
 const col  = c => PAL[c] || PAL.yellow;
 const short = (s, n=16) => s.length > n ? s.slice(0, n) + '…' : s;
@@ -707,11 +779,17 @@ function addInterval(dateStr, frequency, step = 1) {
   return d.toISOString().slice(0, 10);
 }
 
+function dueInDays(dateStr) {
+  const now = new Date(todayStr() + 'T12:00:00');
+  const due = new Date(dateStr + 'T12:00:00');
+  return Math.round((due - now) / 86400000);
+}
+
 function instStatus(inst) {
   if (inst.paid) return 'paid';
   const t = todayStr();
   if (inst.dueDate < t) return 'overdue';
-  const soon = new Date(); soon.setDate(soon.getDate() + 7);
+  const soon = new Date(); soon.setDate(soon.getDate() + reminderSettings.daysBefore);
   if (inst.dueDate <= soon.toISOString().slice(0,10)) return 'upcoming';
   return 'pending';
 }
@@ -726,6 +804,30 @@ function payTypeName(type, otherDesc) {
   if (type === 'transfer') return 'Transferencia';
   if (type === 'cash') return 'Efectivo';
   return otherDesc || 'Otro';
+}
+
+function getDebtContext(debtId) {
+  const debt = debts.find(d => d.id === debtId);
+  const debtor = debt ? debtors.find(d => d.id === debt.debtorId) : null;
+  const lender = debt?.lenderId ? lenders.find(l => l.id === debt.lenderId) : null;
+  return { debt, debtor, lender };
+}
+
+function buildReminderMessage(inst) {
+  const { debt, debtor, lender } = getDebtContext(inst.debtId);
+  const days = dueInDays(inst.dueDate);
+  const dueText = days < 0 ? `venció hace ${Math.abs(days)} día${Math.abs(days) !== 1 ? 's' : ''}` :
+    days === 0 ? 'vence hoy' : `vence en ${days} día${days !== 1 ? 's' : ''}`;
+  return `Hola ${debtor?.name || ''}, te recordamos el pago de ${fmt(inst.amount)} de "${debt?.name || 'tu préstamo'}" con ${lender?.name || 'tu prestamista'} que ${dueText} (${fmtDate(inst.dueDate)}).`;
+}
+
+function copyReminderMessage(instId) {
+  const inst = installments.find(i => i.id === instId);
+  if (!inst) return;
+  const text = buildReminderMessage(inst);
+  navigator.clipboard?.writeText(text)
+    .then(() => alert('Mensaje de recordatorio copiado al portapapeles.'))
+    .catch(() => alert(text));
 }
 
 function setWorkspace(next) {
@@ -762,6 +864,105 @@ function renderQuickStats() {
   document.getElementById('qs-evidence').textContent = payments.filter(p => (p.evidence || []).length).length;
 }
 
+function renderOperationsQueue() {
+  const wrap = document.getElementById('ops-queue');
+  const overdue = installments.filter(i => instStatus(i) === 'overdue').slice(0, 4).map(i => ({ type:'overdue', inst:i }));
+  const upcoming = installments.filter(i => instStatus(i) === 'upcoming').slice(0, 4).map(i => ({ type:'upcoming', inst:i }));
+  const missingEvidence = payments.filter(p => !(p.evidence || []).length).slice(0, 3).map(p => ({ type:'evidence', payment:p }));
+  const unplanned = debts.filter(d => {
+    const planned = installments.filter(i => i.debtId === d.id).reduce((s, i) => s + i.amount, 0);
+    return d.total - planned > 0.01;
+  }).slice(0, 3).map(d => ({ type:'plan', debt:d }));
+
+  const items = [...overdue, ...upcoming, ...missingEvidence, ...unplanned].slice(0, 8);
+  if (!items.length) {
+    wrap.innerHTML = '<div class="ops-empty">No hay pendientes urgentes en este momento.</div>';
+    return;
+  }
+
+  wrap.innerHTML = items.map(item => {
+    if (item.type === 'evidence') {
+      const { debt, debtor } = getDebtContext(item.payment.debtId);
+      return `<div class="ops-item">
+        <div class="ops-item-main">
+          <div class="ops-item-title">Pago sin evidencia</div>
+          <div class="ops-item-meta">${debtor?.name || '—'} · ${debt?.name || '—'} · ${fmt(item.payment.amount)} · ${fmtDate(item.payment.date)}</div>
+        </div>
+        <div class="ops-item-actions">
+          <button class="btn sm" onclick="openEvidenceModal(${item.payment.id})">Agregar evidencia</button>
+        </div>
+      </div>`;
+    }
+    if (item.type === 'plan') {
+      const { debtor } = getDebtContext(item.debt.id);
+      return `<div class="ops-item">
+        <div class="ops-item-main">
+          <div class="ops-item-title">Préstamo incompleto</div>
+          <div class="ops-item-meta">${debtor?.name || '—'} · ${item.debt.name} aún no cubre todo el plan estimado.</div>
+        </div>
+        <div class="ops-item-actions">
+          <button class="btn sm" onclick="openAddInstallmentModal(${item.debt.id})">Completar plan</button>
+        </div>
+      </div>`;
+    }
+    const { debt, debtor } = getDebtContext(item.inst.debtId);
+    const title = item.type === 'overdue' ? 'Pago vencido' : 'Pago por vencer';
+    return `<div class="ops-item">
+      <div class="ops-item-main">
+        <div class="ops-item-title">${title}</div>
+        <div class="ops-item-meta">${debtor?.name || '—'} · ${debt?.name || '—'} · ${fmt(item.inst.amount)} · ${fmtDate(item.inst.dueDate)}</div>
+      </div>
+      <div class="ops-item-actions">
+        <button class="btn sm" onclick="copyReminderMessage(${item.inst.id})">Copiar mensaje</button>
+        <button class="btn sm primary" onclick="openPaymentModal(${item.inst.debtId},${item.inst.id})">Registrar pago</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateReminderStatus() {
+  const status = document.getElementById('reminder-status');
+  const permission = typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
+  const permText = permission === 'granted' ? 'Avisos del navegador activos.' :
+    permission === 'denied' ? 'El navegador bloqueó los avisos.' : 'Los avisos se muestran dentro de la app.';
+  status.textContent = `${permText} Ventana previa: ${reminderSettings.daysBefore} día(s). Canal sugerido: ${reminderSettings.channel.toUpperCase()}.`;
+}
+
+async function requestBrowserNotifications() {
+  if (typeof Notification === 'undefined') {
+    alert('Este navegador no soporta notificaciones.');
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  updateReminderStatus();
+  if (permission !== 'granted') alert('No se pudieron activar las notificaciones del navegador.');
+}
+
+function testReminderNotification() {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    new Notification('DebtTracker', { body:'Recordatorio de prueba: revisa tu cola de cobranza.' });
+  } else {
+    alert('Recordatorio de prueba: revisa tu cola de cobranza.');
+  }
+}
+
+function dispatchDueNotifications() {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const notified = JSON.parse(localStorage.getItem('debt-tracker-notified') || '{}');
+  const today = todayStr();
+  installments
+    .filter(i => ['overdue', 'upcoming'].includes(instStatus(i)))
+    .forEach(inst => {
+      const key = `${today}:${inst.id}:${instStatus(inst)}`;
+      if (notified[key]) return;
+      const { debt, debtor } = getDebtContext(inst.debtId);
+      const body = `${debtor?.name || 'Deudor'} · ${debt?.name || 'Préstamo'} · ${fmt(inst.amount)} · ${fmtDate(inst.dueDate)}`;
+      new Notification(instStatus(inst) === 'overdue' ? 'Pago vencido' : 'Pago por vencer', { body });
+      notified[key] = true;
+    });
+  localStorage.setItem('debt-tracker-notified', JSON.stringify(notified));
+}
+
 // ── Render ────────────────────────────────────────────────
 function render() {
   const totalDebt  = debts.reduce((s,d) => s + d.total, 0);
@@ -788,6 +989,7 @@ function render() {
       : 'No hay cuotas pendientes en este momento. Puedes registrar nuevos préstamos o capturar pagos manuales.';
 
   renderQuickStats();
+  renderOperationsQueue();
   renderAlerts();
   renderLenders();
   renderDebtors();
@@ -796,6 +998,7 @@ function render() {
   renderPayFilters();
   renderPaymentsTable();
   renderCharts();
+  dispatchDueNotifications();
 }
 
 // ── Alerts ────────────────────────────────────────────────
@@ -1036,6 +1239,7 @@ function renderPlan() {
       <td class="mono">${fmt(inst.amount)}</td>
       <td><span class="badge ${st}">${labels[st]}</span></td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">
+        ${!inst.paid ? `<button class="btn sm" onclick="copyReminderMessage(${inst.id})">Recordar</button>` : ''}
         <button class="btn sm" onclick="openEditInstallmentModal(${inst.id})">Editar</button>
         ${!inst.paid ? `<button class="btn sm primary" onclick="openPaymentModal(${inst.debtId},${inst.id})">Pagar</button>` : ''}
         ${inst.paid ? (() => { const lp = payments.filter(p=>p.installmentId===inst.id).sort((a,b)=>b.id-a.id)[0]; return lp ? `<button class="btn sm" style="font-size:11px;padding:3px 8px" onclick="openEvidenceModal(${lp.id})">📎 Evidencia</button>` : ''; })() : ''}
@@ -1952,7 +2156,15 @@ async function downloadAllEvidence() {
 }
 
 // ── Init ──────────────────────────────────────────────────
-loadData().then(() => render()).catch(e => console.error('Error cargando datos:', e));
+loadReminderSettings();
+loadData().then(() => {
+  render();
+  setInterval(() => {
+    renderAlerts();
+    renderOperationsQueue();
+    dispatchDueNotifications();
+  }, 60000);
+}).catch(e => console.error('Error cargando datos:', e));
 </script>
 </body>
 </html>
