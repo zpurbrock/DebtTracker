@@ -138,6 +138,19 @@ async function logActivity(debtId, entity, entityId, action, detail) {
   );
 }
 
+function csvEscape(value) {
+  if (value === null || value === undefined) return '';
+  const s = String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function sendCsv(res, filename, headers, rows) {
+  const csv = [headers.join(','), ...rows.map(row => row.map(csvEscape).join(','))].join('\n');
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(csv);
+}
+
 // ── Lenders ───────────────────────────────────────────────
 app.get('/api/lenders', async (req, res) => {
   try { res.json((await pool.query('SELECT * FROM lenders ORDER BY name')).rows.map(mapLender)); }
@@ -440,6 +453,85 @@ app.get('/api/debts/:id/activity', async (req, res) => {
   try {
     const r = await pool.query('SELECT * FROM activity_log WHERE debt_id=$1 ORDER BY created_at DESC, id DESC LIMIT 100', [req.params.id]);
     res.json(r.rows.map(mapActivity));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/reports/summary', async (req, res) => {
+  try {
+    const [debtsR, installmentsR, paymentsR] = await Promise.all([
+      pool.query('SELECT * FROM debts ORDER BY id'),
+      pool.query('SELECT * FROM installments ORDER BY id'),
+      pool.query('SELECT * FROM payments ORDER BY id'),
+    ]);
+    const debts = debtsR.rows.map(mapDebt);
+    const installments = installmentsR.rows.map(mapInst);
+    const payments = paymentsR.rows.map(r => ({ ...mapPay(r, []), evidence: [] }));
+    const totalDebt = debts.reduce((s, d) => s + d.total, 0);
+    const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+    const overdueInstallments = installments.filter(i => !i.paid && i.dueDate && i.dueDate < new Date().toISOString().slice(0, 10));
+    const overdueAmount = overdueInstallments.reduce((s, i) => s + i.amount, 0);
+    const activeLoans = debts.filter(d => d.status !== 'settled').length;
+    res.json({
+      totalDebt,
+      totalPaid,
+      balance: totalDebt - totalPaid,
+      overdueInstallments: overdueInstallments.length,
+      overdueAmount,
+      activeLoans,
+      recoveryPct: totalDebt ? Number(((totalPaid / totalDebt) * 100).toFixed(1)) : 0,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/export/debts.csv', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT d.id,d.name,d.total,d.start_date,d.payment_frequency,d.estimated_payments,d.payment_amount,d.status,
+             db.name AS debtor_name, l.name AS lender_name
+      FROM debts d
+      LEFT JOIN debtors db ON db.id = d.debtor_id
+      LEFT JOIN lenders l ON l.id = d.lender_id
+      ORDER BY d.id
+    `);
+    sendCsv(res, 'debts.csv',
+      ['id','deudor','prestamista','prestamo','total','fecha_inicio','frecuencia','pagos_estimados','monto_pago','estado'],
+      r.rows.map(row => [
+        row.id, row.debtor_name, row.lender_name, row.name, row.total, row.start_date, row.payment_frequency,
+        row.estimated_payments, row.payment_amount, row.status
+      ])
+    );
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/export/installments.csv', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT i.id,i.description,i.due_date,i.amount,i.paid,d.name AS debt_name, db.name AS debtor_name
+      FROM installments i
+      JOIN debts d ON d.id = i.debt_id
+      LEFT JOIN debtors db ON db.id = d.debtor_id
+      ORDER BY i.id
+    `);
+    sendCsv(res, 'installments.csv',
+      ['id','deudor','prestamo','descripcion','vencimiento','monto','pagada'],
+      r.rows.map(row => [row.id, row.debtor_name, row.debt_name, row.description, row.due_date, row.amount, row.paid])
+    );
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/export/payments.csv', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT p.id,p.date,p.amount,p.type,p.other_desc,d.name AS debt_name, db.name AS debtor_name
+      FROM payments p
+      JOIN debts d ON d.id = p.debt_id
+      LEFT JOIN debtors db ON db.id = d.debtor_id
+      ORDER BY p.id
+    `);
+    sendCsv(res, 'payments.csv',
+      ['id','deudor','prestamo','fecha','monto','tipo','detalle'],
+      r.rows.map(row => [row.id, row.debtor_name, row.debt_name, row.date, row.amount, row.type, row.other_desc])
+    );
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
