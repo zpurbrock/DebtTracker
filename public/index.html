@@ -465,6 +465,36 @@
       <input type="text" id="debt-name" placeholder="Ej: Préstamo coche" />
     </div>
     <div class="field">
+      <label>Fecha de inicio del préstamo</label>
+      <input type="date" id="debt-start-date" />
+    </div>
+    <div class="field">
+      <label>Frecuencia esperada de pago</label>
+      <select id="debt-frequency">
+        <option value="weekly">Semanal</option>
+        <option value="biweekly">Quincenal</option>
+        <option value="monthly" selected>Mensual</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Total estimado de pagos</label>
+      <input type="number" id="debt-estimated-payments" placeholder="12" min="0" max="360" />
+    </div>
+    <div class="field">
+      <label>Monto esperado por pago <span class="hint">(opcional)</span></label>
+      <input type="number" id="debt-payment-amount" placeholder="0" min="0" step="0.01" />
+    </div>
+    <div class="field">
+      <label>Estado del préstamo</label>
+      <select id="debt-status">
+        <option value="active">Activo</option>
+        <option value="current">Al día</option>
+        <option value="overdue">Con atraso</option>
+        <option value="settled">Liquidado</option>
+        <option value="restructured">Reestructurado</option>
+      </select>
+    </div>
+    <div class="field">
       <label>Rubros <span class="hint">(desglose opcional — el total se calcula automáticamente)</span></label>
       <div id="rubros-list"></div>
       <button type="button" class="btn sm" style="margin-top:4px" onclick="addRubroRow()">+ Agregar rubro</button>
@@ -518,7 +548,7 @@
           <input type="radio" name="inst-type" value="single" checked onchange="toggleInstType(this)"> Una cuota
         </label>
         <label class="radio-opt" id="rl-monthly">
-          <input type="radio" name="inst-type" value="monthly" onchange="toggleInstType(this)"> Plan mensual
+          <input type="radio" name="inst-type" value="schedule" onchange="toggleInstType(this)"> Plan automático
         </label>
       </div>
     </div>
@@ -529,6 +559,13 @@
     </div>
     <div id="inst-monthly-fields" style="display:none">
       <div class="field"><label>Fecha del primer pago</label><input type="date" id="inst-start-date" /></div>
+      <div class="field"><label>Frecuencia</label>
+        <select id="inst-frequency">
+          <option value="weekly">Semanal</option>
+          <option value="biweekly">Quincenal</option>
+          <option value="monthly" selected>Mensual</option>
+        </select>
+      </div>
       <div class="field"><label>Monto por cuota</label><input type="number" id="inst-monthly-amount" placeholder="0" min="0" step="0.01" /></div>
       <div class="field"><label>Número de cuotas</label><input type="number" id="inst-num" placeholder="12" min="1" max="360" /></div>
     </div>
@@ -659,6 +696,16 @@ const col  = c => PAL[c] || PAL.yellow;
 const short = (s, n=16) => s.length > n ? s.slice(0, n) + '…' : s;
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const paidForDebt = id => payments.filter(p => p.debtId === id).reduce((s,p) => s + p.amount, 0);
+const frequencyLabel = f => ({ weekly:'Semanal', biweekly:'Quincenal', monthly:'Mensual' }[f] || 'Mensual');
+const debtStatusLabel = s => ({ active:'Activo', current:'Al día', overdue:'Con atraso', settled:'Liquidado', restructured:'Reestructurado' }[s] || 'Activo');
+
+function addInterval(dateStr, frequency, step = 1) {
+  const d = new Date(dateStr + 'T12:00:00');
+  if (frequency === 'weekly') d.setDate(d.getDate() + (7 * step));
+  else if (frequency === 'biweekly') d.setDate(d.getDate() + (14 * step));
+  else d.setMonth(d.getMonth() + step);
+  return d.toISOString().slice(0, 10);
+}
 
 function instStatus(inst) {
   if (inst.paid) return 'paid';
@@ -837,11 +884,20 @@ function renderDebtors() {
       const cats  = d.categories || [];
       const pend   = installments.filter(i => i.debtId === d.id && !i.paid).length;
       const over   = installments.filter(i => i.debtId === d.id && instStatus(i) === 'overdue').length;
-      const lender = d.lenderId ? lenders.find(l => l.id === d.lenderId) : null;
+        const lender = d.lenderId ? lenders.find(l => l.id === d.lenderId) : null;
+        const nextDue = installments
+          .filter(i => i.debtId === d.id && !i.paid)
+          .sort((a,b) => (a.dueDate || '').localeCompare(b.dueDate || ''))[0];
       return `<div class="debt-card">
         <button class="del-btn" onclick="event.stopPropagation();deleteDebt(${d.id})">✕</button>
         <div class="dc-name">${d.name}</div>
         ${lender ? `<div class="dc-row" style="margin-bottom:6px">Prestamista <span style="color:var(--accent);font-family:'DM Sans'">${lender.name}</span></div>` : ''}
+        <div class="dc-row">Frecuencia <span style="font-family:'DM Sans'">${frequencyLabel(d.paymentFrequency)}</span></div>
+        <div class="dc-row">Estado <span style="font-family:'DM Sans'">${debtStatusLabel(d.status)}</span></div>
+        ${d.startDate ? `<div class="dc-row">Inicio <span style="font-family:'DM Sans'">${fmtDate(d.startDate)}</span></div>` : ''}
+        ${d.estimatedPayments ? `<div class="dc-row">Pagos est. <span>${d.estimatedPayments}</span></div>` : ''}
+        ${d.paymentAmount ? `<div class="dc-row">Pago esperado <span>${fmt(d.paymentAmount)}</span></div>` : ''}
+        ${nextDue ? `<div class="dc-row">Próximo pago <span style="font-family:'DM Sans'">${fmtDate(nextDue.dueDate)}</span></div>` : ''}
         ${cats.length ? `<div class="dc-cats">${cats.map(c => `<span class="tag">${c}</span>`).join('')}</div>` : ''}
         ${(d.rubros||[]).length ? `<div class="dc-rubros">${d.rubros.map((r,ri)=>{
           const rpaid = payments.filter(p=>p.debtId===d.id&&p.rubroIdx===ri).reduce((s,p)=>s+p.amount,0);
@@ -1210,6 +1266,11 @@ function resetDebtForm(preDebtorId, debt) {
   lSel.innerHTML = '<option value="">— Sin prestamista —</option>' + lenders.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
   lSel.value = debt?.lenderId || '';
   document.getElementById('debt-name').value = debt?.name || '';
+  document.getElementById('debt-start-date').value = debt?.startDate || todayStr();
+  document.getElementById('debt-frequency').value = debt?.paymentFrequency || 'monthly';
+  document.getElementById('debt-estimated-payments').value = debt?.estimatedPayments || '';
+  document.getElementById('debt-payment-amount').value = debt?.paymentAmount || '';
+  document.getElementById('debt-status').value = debt?.status || 'active';
   document.getElementById('debt-total').value = debt?.total || '';
   document.getElementById('debt-total').readOnly = false;
   document.getElementById('debt-total').style.opacity = '1';
@@ -1253,8 +1314,14 @@ function openAddInstallmentModal(preDebtId) {
   if (preDebtId) sel.value = preDebtId;
   updateInstRubro();
   document.getElementById('inst-date').value = todayStr();
-  document.getElementById('inst-start-date').value = todayStr();
+  const selectedDebt = debts.find(d => d.id === parseInt(sel.value));
+  document.getElementById('inst-start-date').value = selectedDebt?.startDate || todayStr();
+  document.getElementById('inst-frequency').value = selectedDebt?.paymentFrequency || 'monthly';
+  document.getElementById('inst-monthly-amount').value = selectedDebt?.paymentAmount || '';
+  document.getElementById('inst-num').value = selectedDebt?.estimatedPayments || '';
   ['inst-amount','inst-monthly-amount','inst-num','inst-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inst-monthly-amount').value = selectedDebt?.paymentAmount || '';
+  document.getElementById('inst-num').value = selectedDebt?.estimatedPayments || '';
   document.querySelector('input[name="inst-type"][value="single"]').checked = true;
   document.getElementById('inst-single-fields').style.display = '';
   document.getElementById('inst-monthly-fields').style.display = 'none';
@@ -1283,13 +1350,22 @@ function openEditInstallmentModal(id) {
   document.getElementById('inst-amount').value = inst.amount || '';
   document.getElementById('inst-desc').value = inst.description || '';
   document.getElementById('inst-start-date').value = inst.dueDate || todayStr();
+  const debt = debts.find(d => d.id === inst.debtId);
+  document.getElementById('inst-frequency').value = debt?.paymentFrequency || 'monthly';
   ['inst-monthly-amount','inst-num'].forEach(id2 => document.getElementById(id2).value = '');
   openModal('modal-installment');
 }
 
 function updateInstRubro() {
   const debtId = parseInt(document.getElementById('inst-debt').value);
+  const debt = debts.find(d => d.id === debtId);
   updateDebtRubroSelect('inst-rubro', 'inst-rubro-field', debtId);
+  if (!editingInstallmentId && debt) {
+    document.getElementById('inst-start-date').value = debt.startDate || todayStr();
+    document.getElementById('inst-frequency').value = debt.paymentFrequency || 'monthly';
+    if (!document.getElementById('inst-monthly-amount').value) document.getElementById('inst-monthly-amount').value = debt.paymentAmount || '';
+    if (!document.getElementById('inst-num').value) document.getElementById('inst-num').value = debt.estimatedPayments || '';
+  }
 }
 
 function openPaymentModal(preDebtId, preInstId) {
@@ -1479,6 +1555,27 @@ function getRubros() {
     .filter(r => r.name || r.amount);
 }
 
+async function syncDebtScheduleMeta(debtId, patch) {
+  const debt = debts.find(d => d.id === debtId);
+  if (!debt) return null;
+  const updated = await api('PATCH', `/api/debts/${debtId}`, {
+    debtorId: debt.debtorId,
+    lenderId: debt.lenderId,
+    name: debt.name,
+    total: debt.total,
+    categories: debt.categories || [],
+    rubros: debt.rubros || [],
+    color: debt.color,
+    startDate: patch.startDate !== undefined ? patch.startDate : debt.startDate,
+    paymentFrequency: patch.paymentFrequency !== undefined ? patch.paymentFrequency : debt.paymentFrequency,
+    estimatedPayments: patch.estimatedPayments !== undefined ? patch.estimatedPayments : debt.estimatedPayments,
+    paymentAmount: patch.paymentAmount !== undefined ? patch.paymentAmount : debt.paymentAmount,
+    status: patch.status !== undefined ? patch.status : debt.status,
+  });
+  debts = debts.map(d => d.id === debtId ? updated : d);
+  return updated;
+}
+
 // ── CRUD ──────────────────────────────────────────────────
 let _saving = false;
 function withSave(btnId, fn) {
@@ -1513,6 +1610,11 @@ async function saveDebtor() {
 async function saveDebt() {
   const debtorId   = parseInt(document.getElementById('debt-debtor').value);
   const name       = document.getElementById('debt-name').value.trim();
+  const startDate  = document.getElementById('debt-start-date').value || null;
+  const paymentFrequency = document.getElementById('debt-frequency').value;
+  const estimatedPayments = parseInt(document.getElementById('debt-estimated-payments').value) || 0;
+  const paymentAmount = parseFloat(document.getElementById('debt-payment-amount').value) || 0;
+  const status = document.getElementById('debt-status').value;
   const total      = parseFloat(document.getElementById('debt-total').value) || 0;
   const categories = JSON.parse(document.getElementById('debt-cats-data').value || '[]');
   const color      = document.getElementById('debt-color').value;
@@ -1520,7 +1622,7 @@ async function saveDebt() {
   const rubros     = getRubros();
   if (!debtorId || !name) return;
   try {
-    const payload = { debtorId, lenderId, name, total, categories, rubros, color };
+    const payload = { debtorId, lenderId, name, total, categories, rubros, color, startDate, paymentFrequency, estimatedPayments, paymentAmount, status };
     const d = editingDebtId
       ? await api('PATCH', `/api/debts/${editingDebtId}`, payload)
       : await api('POST', '/api/debts', payload);
@@ -1561,17 +1663,30 @@ async function saveInstallments() {
     newInsts.push({ debtId, rubroIdx, dueDate, amount, description, paid: false });
   } else {
     const startDate = document.getElementById('inst-start-date').value;
+    const frequency = document.getElementById('inst-frequency').value;
     const amount    = parseFloat(document.getElementById('inst-monthly-amount').value) || 0;
     const num       = parseInt(document.getElementById('inst-num').value) || 0;
     if (!startDate || !amount || !num) return;
-    const base = new Date(startDate + 'T12:00:00');
     for (let i=0; i<num; i++) {
-      const d = new Date(base);
-      d.setMonth(d.getMonth() + i);
-      newInsts.push({ debtId, rubroIdx, dueDate: d.toISOString().slice(0,10), amount, description: `Cuota ${i+1}`, paid: false });
+      newInsts.push({
+        debtId,
+        rubroIdx,
+        dueDate: addInterval(startDate, frequency, i),
+        amount,
+        description: `Cuota ${i+1}`,
+        paid: false
+      });
     }
   }
   try {
+    if (type !== 'single') {
+      await syncDebtScheduleMeta(debtId, {
+        startDate: document.getElementById('inst-start-date').value,
+        paymentFrequency: document.getElementById('inst-frequency').value,
+        estimatedPayments: parseInt(document.getElementById('inst-num').value) || 0,
+        paymentAmount: parseFloat(document.getElementById('inst-monthly-amount').value) || 0
+      });
+    }
     for (const inst of newInsts) {
       const saved = await api('POST', '/api/installments', inst);
       installments.push(saved);

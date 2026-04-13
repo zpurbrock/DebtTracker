@@ -34,7 +34,12 @@ async function initDB() {
       total      NUMERIC(15,2) DEFAULT 0,
       categories JSONB DEFAULT '[]',
       rubros     JSONB DEFAULT '[]',
-      color      TEXT DEFAULT 'yellow'
+      color      TEXT DEFAULT 'yellow',
+      start_date DATE,
+      payment_frequency TEXT DEFAULT 'monthly',
+      estimated_payments INT DEFAULT 0,
+      payment_amount NUMERIC(15,2) DEFAULT 0,
+      status TEXT DEFAULT 'active'
     );
     CREATE TABLE IF NOT EXISTS installments (
       id          SERIAL PRIMARY KEY,
@@ -64,6 +69,12 @@ async function initDB() {
       size       INT  NOT NULL,
       data       BYTEA NOT NULL
     );
+
+    ALTER TABLE debts ADD COLUMN IF NOT EXISTS start_date DATE;
+    ALTER TABLE debts ADD COLUMN IF NOT EXISTS payment_frequency TEXT DEFAULT 'monthly';
+    ALTER TABLE debts ADD COLUMN IF NOT EXISTS estimated_payments INT DEFAULT 0;
+    ALTER TABLE debts ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(15,2) DEFAULT 0;
+    ALTER TABLE debts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
   `);
 }
 
@@ -74,6 +85,11 @@ const mapDebt   = r => ({
   id: r.id, debtorId: r.debtor_id, lenderId: r.lender_id,
   name: r.name, total: parseFloat(r.total),
   categories: r.categories || [], rubros: r.rubros || [], color: r.color,
+  startDate: r.start_date ? r.start_date.toISOString().slice(0, 10) : null,
+  paymentFrequency: r.payment_frequency || 'monthly',
+  estimatedPayments: r.estimated_payments || 0,
+  paymentAmount: parseFloat(r.payment_amount || 0),
+  status: r.status || 'active',
 });
 const mapInst = r => ({
   id: r.id, debtId: r.debt_id, description: r.description,
@@ -140,25 +156,30 @@ app.get('/api/debts', async (req, res) => {
 });
 app.post('/api/debts', async (req, res) => {
   try {
-    const { debtorId, lenderId, name, total, categories, rubros, color } = req.body;
+    const { debtorId, lenderId, name, total, categories, rubros, color, startDate, paymentFrequency, estimatedPayments, paymentAmount, status } = req.body;
     const r = await pool.query(
-      'INSERT INTO debts(debtor_id,lender_id,name,total,categories,rubros,color) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+      `INSERT INTO debts(debtor_id,lender_id,name,total,categories,rubros,color,start_date,payment_frequency,estimated_payments,payment_amount,status)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [debtorId, lenderId || null, name, total || 0,
-       JSON.stringify(categories || []), JSON.stringify(rubros || []), color || 'yellow']
+       JSON.stringify(categories || []), JSON.stringify(rubros || []), color || 'yellow',
+       startDate || null, paymentFrequency || 'monthly', estimatedPayments || 0, paymentAmount || 0, status || 'active']
     );
     res.json(mapDebt(r.rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.patch('/api/debts/:id', async (req, res) => {
   try {
-    const { debtorId, lenderId, name, total, categories, rubros, color } = req.body;
+    const { debtorId, lenderId, name, total, categories, rubros, color, startDate, paymentFrequency, estimatedPayments, paymentAmount, status } = req.body;
     const r = await pool.query(
       `UPDATE debts
-       SET debtor_id=$1, lender_id=$2, name=$3, total=$4, categories=$5, rubros=$6, color=$7
-       WHERE id=$8
+       SET debtor_id=$1, lender_id=$2, name=$3, total=$4, categories=$5, rubros=$6, color=$7,
+           start_date=$8, payment_frequency=$9, estimated_payments=$10, payment_amount=$11, status=$12
+       WHERE id=$13
        RETURNING *`,
       [debtorId, lenderId || null, name, total || 0,
-       JSON.stringify(categories || []), JSON.stringify(rubros || []), color || 'yellow', req.params.id]
+       JSON.stringify(categories || []), JSON.stringify(rubros || []), color || 'yellow',
+       startDate || null, paymentFrequency || 'monthly', estimatedPayments || 0, paymentAmount || 0, status || 'active',
+       req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(mapDebt(r.rows[0]));
