@@ -38,6 +38,24 @@
     .topbar-left h1 span { color:var(--accent); }
     .topbar-left p { font-size:13px; color:var(--text2); margin-top:2px; }
     .topbar-right { display:flex; gap:8px; flex-wrap:wrap; }
+    .workspace-nav { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 1rem; }
+    .workspace-tab { font-family:'DM Sans',sans-serif; font-size:13px; padding:8px 14px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text2); cursor:pointer; transition:all 0.15s; }
+    .workspace-tab.active { background:var(--accent); border-color:var(--accent); color:#0f0f0f; font-weight:600; }
+    .workspace { display:none; }
+    .workspace.active { display:block; }
+    .hero { display:grid; grid-template-columns:1.3fr 1fr; gap:12px; margin-bottom:1.5rem; }
+    .hero-card, .quick-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem; }
+    .hero-card h2 { font-size:22px; line-height:1.15; margin-bottom:8px; letter-spacing:-0.03em; }
+    .hero-card p, .quick-card p { font-size:13px; color:var(--text2); }
+    .quick-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+    .quick-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:14px; }
+    .quick-stat { padding:10px 12px; border-radius:10px; background:var(--surface2); border:1px solid var(--border); }
+    .quick-stat .label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.06em; }
+    .quick-stat .value { font-size:17px; margin-top:4px; font-family:'DM Mono',monospace; }
+    .ops-bar { display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:1rem; }
+    .ops-search { min-width:220px; flex:1; max-width:360px; }
+    .ops-search input { width:100%; background:var(--surface); border:1px solid var(--border2); border-radius:999px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:13px; padding:10px 14px; outline:none; }
+    .ops-search input:focus { border-color:var(--accent); }
 
     /* Buttons */
     .btn { font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; padding:8px 16px; border-radius:var(--radius-sm); border:1px solid var(--border2); background:var(--surface2); color:var(--text); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
@@ -94,6 +112,7 @@
     .mini-fill { height:3px; border-radius:99px; transition:width 0.4s; }
     .dc-pills { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px; }
     .dc-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .dc-actions.tight { margin-top:10px; }
     .del-btn { position:absolute; top:8px; right:8px; background:none; border:none; color:var(--text3); font-size:13px; cursor:pointer; line-height:1; transition:color 0.15s; }
     .del-btn:hover { color:var(--danger); }
     .add-debt-card { border:1px dashed var(--border2); border-radius:var(--radius-sm); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-height:120px; background:none; color:var(--text3); font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all 0.15s; width:100%; }
@@ -148,6 +167,7 @@
     .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:1.25rem; }
     .error-msg { font-size:12px; color:var(--danger); margin-top:4px; display:none; }
     .error-msg.visible { display:block; }
+    .modal-note { font-size:12px; color:var(--text3); margin-bottom:10px; }
     .radio-group { display:flex; gap:6px; flex-wrap:wrap; }
     .radio-opt { flex:1; min-width:80px; display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border2); border-radius:var(--radius-sm); padding:8px 10px; cursor:pointer; font-size:13px; transition:all 0.15s; }
     .radio-opt input[type=radio] { accent-color:var(--accent); }
@@ -189,6 +209,7 @@
 
     /* Responsive */
     @media (max-width:768px) {
+      .hero { grid-template-columns:1fr; }
       .metrics { grid-template-columns:repeat(2,1fr); }
       .charts-grid { grid-template-columns:1fr; }
       .chart-card.full { grid-column:1; }
@@ -216,6 +237,12 @@
     </div>
   </div>
 
+  <div class="workspace-nav">
+    <button class="workspace-tab active" id="tab-summary" onclick="setWorkspace('summary')">Resumen</button>
+    <button class="workspace-tab" id="tab-loans" onclick="setWorkspace('loans')">Préstamos</button>
+    <button class="workspace-tab" id="tab-payments" onclick="setWorkspace('payments')">Pagos y vencimientos</button>
+  </div>
+
   <!-- Alert bar -->
   <div class="alert-bar" id="alert-bar">
     <div class="alert-item overdue" id="alert-overdue" style="display:none">
@@ -226,8 +253,42 @@
       <span class="alert-dot upcoming"></span>
       <span id="alert-upcoming-text"></span>
     </div>
-    <span class="alert-link" onclick="document.getElementById('section-plan').scrollIntoView({behavior:'smooth'})">Ver plan de pagos →</span>
+    <span class="alert-link" onclick="setWorkspace('payments');document.getElementById('section-plan').scrollIntoView({behavior:'smooth'})">Ver plan de pagos →</span>
   </div>
+
+  <section id="workspace-summary" class="workspace active">
+    <div class="hero">
+      <div class="hero-card">
+        <h2>Una vista rápida de lo que necesita atención hoy</h2>
+        <p id="hero-copy">Revisa vencimientos, registra pagos y mantén organizada la cartera sin perder tiempo entre pantallas.</p>
+        <div class="quick-actions">
+          <button class="btn primary" onclick="openPaymentModal()">Registrar pago</button>
+          <button class="btn" onclick="openAddDebtModal()">Registrar préstamo</button>
+          <button class="btn" onclick="setWorkspace('payments')">Ver vencimientos</button>
+        </div>
+      </div>
+      <div class="quick-card">
+        <p>Atajos operativos</p>
+        <div class="quick-grid">
+          <div class="quick-stat">
+            <div class="label">Próximo vencimiento</div>
+            <div class="value" id="qs-next-due">—</div>
+          </div>
+          <div class="quick-stat">
+            <div class="label">Último pago</div>
+            <div class="value" id="qs-last-payment">—</div>
+          </div>
+          <div class="quick-stat">
+            <div class="label">Prestamistas</div>
+            <div class="value" id="qs-lenders">0</div>
+          </div>
+          <div class="quick-stat">
+            <div class="label">Pagos con evidencia</div>
+            <div class="value" id="qs-evidence">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
   <!-- Metrics -->
   <div class="metrics">
@@ -281,62 +342,84 @@
       <div class="chart-wrap"><canvas id="chart-progress"></canvas></div>
     </div>
   </div>
+  </section>
 
-  <!-- Prestamistas -->
-  <div class="section-hdr">
-    <span class="section-title">Prestamistas</span>
-    <button class="btn sm" onclick="openAddLenderModal()">+ Prestamista</button>
-  </div>
-  <div class="debtors-list" id="lenders-list"></div>
+  <section id="workspace-loans" class="workspace">
+    <div class="ops-bar">
+      <div>
+        <div class="section-title">Operación de préstamos</div>
+        <p style="font-size:13px;color:var(--text2);margin-top:4px">Busca rápido por deudor, préstamo o prestamista y edita desde la misma vista.</p>
+      </div>
+      <div class="ops-search">
+        <input type="text" id="loan-search" placeholder="Buscar deudor, préstamo o prestamista..." oninput="setLoanSearch(this.value)" />
+      </div>
+    </div>
 
-  <!-- Deudores & Deudas -->
-  <div class="section-hdr">
-    <span class="section-title">Deudores y deudas</span>
-    <button class="btn sm" onclick="openAddDebtorModal()">+ Deudor</button>
-  </div>
-  <div class="debtors-list" id="debtors-list"></div>
+    <div class="section-hdr">
+      <span class="section-title">Prestamistas</span>
+      <button class="btn sm" onclick="openAddLenderModal()">+ Prestamista</button>
+    </div>
+    <div class="debtors-list" id="lenders-list"></div>
 
-  <!-- Plan de pagos -->
-  <div class="section-hdr" id="section-plan">
-    <span class="section-title">Plan de pagos</span>
-    <button class="btn sm" onclick="openAddInstallmentModal()">+ Cuotas</button>
-  </div>
-  <div class="filters" id="plan-filters"></div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Vencimiento</th><th>Deudor</th><th>Deuda</th><th>Rubro</th>
-          <th>Descripción</th><th>Monto</th><th>Estado</th><th></th>
-        </tr>
-      </thead>
-      <tbody id="plan-body"></tbody>
-    </table>
-  </div>
+    <div class="section-hdr">
+      <span class="section-title">Deudores y préstamos</span>
+      <button class="btn sm" onclick="openAddDebtorModal()">+ Deudor</button>
+    </div>
+    <div class="debtors-list" id="debtors-list"></div>
+  </section>
 
-  <!-- Historial -->
-  <div class="section-hdr">
-    <span class="section-title">Historial de pagos</span>
-  </div>
-  <div class="filters" id="pay-filters"></div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Fecha</th><th>Deudor</th><th>Deuda</th><th>Rubro</th>
-          <th>Monto</th><th>Tipo de pago</th><th>Cuota</th><th>Evidencia</th><th></th>
-        </tr>
-      </thead>
-      <tbody id="payments-body"></tbody>
-    </table>
-  </div>
+  <section id="workspace-payments" class="workspace">
+    <div class="ops-bar">
+      <div>
+        <div class="section-title">Seguimiento de pagos</div>
+        <p style="font-size:13px;color:var(--text2);margin-top:4px">Enfócate en vencimientos próximos, pagos registrados y evidencias faltantes.</p>
+      </div>
+      <div class="quick-actions" style="margin-top:0">
+        <button class="btn" onclick="openAddInstallmentModal()">+ Cuotas</button>
+        <button class="btn primary" onclick="openPaymentModal()">+ Pago</button>
+      </div>
+    </div>
+
+    <div class="section-hdr" id="section-plan">
+      <span class="section-title">Plan de pagos</span>
+      <button class="btn sm" onclick="openAddInstallmentModal()">+ Cuotas</button>
+    </div>
+    <div class="filters" id="plan-filters"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Vencimiento</th><th>Deudor</th><th>Deuda</th><th>Rubro</th>
+            <th>Descripción</th><th>Monto</th><th>Estado</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="plan-body"></tbody>
+      </table>
+    </div>
+
+    <div class="section-hdr">
+      <span class="section-title">Historial de pagos</span>
+    </div>
+    <div class="filters" id="pay-filters"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th><th>Deudor</th><th>Deuda</th><th>Rubro</th>
+            <th>Monto</th><th>Tipo de pago</th><th>Cuota</th><th>Evidencia</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="payments-body"></tbody>
+      </table>
+    </div>
+  </section>
 
 </div>
 
 <!-- Modal: Nuevo deudor -->
 <div id="modal-debtor" class="modal-bg">
   <div class="modal">
-    <h2>Nuevo deudor</h2>
+    <h2 id="debtor-modal-title">Nuevo deudor</h2>
     <div class="field">
       <label>Nombre completo</label>
       <input type="text" id="debtor-name" placeholder="Ej: Juan Pérez" />
@@ -344,7 +427,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-debtor')">Cancelar</button>
-      <button id="btn-save-debtor" class="btn primary" onclick="withSave('btn-save-debtor',addDebtor)">Agregar</button>
+      <button id="btn-save-debtor" data-label="Agregar" class="btn primary" onclick="withSave('btn-save-debtor',saveDebtor)">Agregar</button>
     </div>
   </div>
 </div>
@@ -352,7 +435,7 @@
 <!-- Modal: Nuevo prestamista -->
 <div id="modal-lender" class="modal-bg">
   <div class="modal">
-    <h2>Nuevo prestamista</h2>
+    <h2 id="lender-modal-title">Nuevo prestamista</h2>
     <div class="field">
       <label>Nombre</label>
       <input type="text" id="lender-name" placeholder="Ej: Banco BBVA, Carlos Ramírez" />
@@ -360,7 +443,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-lender')">Cancelar</button>
-      <button id="btn-save-lender" class="btn primary" onclick="withSave('btn-save-lender',addLender)">Agregar</button>
+      <button id="btn-save-lender" data-label="Agregar" class="btn primary" onclick="withSave('btn-save-lender',saveLender)">Agregar</button>
     </div>
   </div>
 </div>
@@ -368,7 +451,7 @@
 <!-- Modal: Nueva deuda -->
 <div id="modal-debt" class="modal-bg">
   <div class="modal">
-    <h2>Nueva deuda</h2>
+    <h2 id="debt-modal-title">Nueva deuda</h2>
     <div class="field">
       <label>Deudor</label>
       <select id="debt-debtor"></select>
@@ -411,7 +494,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-debt')">Cancelar</button>
-      <button id="btn-save-debt" class="btn primary" onclick="withSave('btn-save-debt',addDebt)">Agregar</button>
+      <button id="btn-save-debt" data-label="Agregar" class="btn primary" onclick="withSave('btn-save-debt',saveDebt)">Agregar</button>
     </div>
   </div>
 </div>
@@ -419,7 +502,7 @@
 <!-- Modal: Plan de pagos / Cuotas -->
 <div id="modal-installment" class="modal-bg">
   <div class="modal">
-    <h2>Agregar cuotas</h2>
+    <h2 id="installment-modal-title">Agregar cuotas</h2>
     <div class="field">
       <label>Deuda</label>
       <select id="inst-debt" onchange="updateInstRubro()"></select>
@@ -451,7 +534,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-installment')">Cancelar</button>
-      <button id="btn-save-inst" class="btn primary" onclick="withSave('btn-save-inst',addInstallments)">Agregar</button>
+      <button id="btn-save-inst" data-label="Agregar" class="btn primary" onclick="withSave('btn-save-inst',saveInstallments)">Agregar</button>
     </div>
   </div>
 </div>
@@ -459,7 +542,7 @@
 <!-- Modal: Registrar pago -->
 <div id="modal-payment" class="modal-bg">
   <div class="modal">
-    <h2>Registrar pago</h2>
+    <h2 id="payment-modal-title">Registrar pago</h2>
     <div class="field">
       <label>Deuda</label>
       <select id="pay-debt" onchange="updatePayDebt()"></select>
@@ -499,7 +582,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('modal-payment')">Cancelar</button>
-      <button id="btn-save-pay" class="btn primary" onclick="withSave('btn-save-pay',addPayment)">Registrar</button>
+      <button id="btn-save-pay" data-label="Registrar" class="btn primary" onclick="withSave('btn-save-pay',savePayment)">Registrar</button>
     </div>
   </div>
 </div>
@@ -544,7 +627,14 @@ let payments     = [];
 let filterPlan   = 'all';
 let filterPay    = 'all';
 let chartView    = 'lender';
+let workspace    = 'summary';
+let loanSearch   = '';
 let charts       = {};
+let editingDebtorId = null;
+let editingLenderId = null;
+let editingDebtId = null;
+let editingInstallmentId = null;
+let editingPaymentId = null;
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -591,6 +681,40 @@ function payTypeName(type, otherDesc) {
   return otherDesc || 'Otro';
 }
 
+function setWorkspace(next) {
+  workspace = next;
+  ['summary', 'loans', 'payments'].forEach(id => {
+    document.getElementById('workspace-' + id).classList.toggle('active', id === next);
+    document.getElementById('tab-' + id).classList.toggle('active', id === next);
+  });
+}
+
+function setLoanSearch(value) {
+  loanSearch = value.trim().toLowerCase();
+  renderLenders();
+  renderDebtors();
+}
+
+function loanMatches(textParts) {
+  if (!loanSearch) return true;
+  return textParts.join(' ').toLowerCase().includes(loanSearch);
+}
+
+function upcomingInstallments() {
+  return installments
+    .filter(i => !i.paid)
+    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+}
+
+function renderQuickStats() {
+  const nextInst = upcomingInstallments()[0];
+  const lastPay = [...payments].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+  document.getElementById('qs-next-due').textContent = nextInst ? fmtDate(nextInst.dueDate) : '—';
+  document.getElementById('qs-last-payment').textContent = lastPay ? fmtDate(lastPay.date) : '—';
+  document.getElementById('qs-lenders').textContent = lenders.length;
+  document.getElementById('qs-evidence').textContent = payments.filter(p => (p.evidence || []).length).length;
+}
+
 // ── Render ────────────────────────────────────────────────
 function render() {
   const totalDebt  = debts.reduce((s,d) => s + d.total, 0);
@@ -610,7 +734,13 @@ function render() {
   document.getElementById('m-pending-inst').textContent = pendInst;
   document.getElementById('m-overdue-inst').textContent = overdueInst + ' vencida' + (overdueInst !== 1 ? 's' : '');
   document.getElementById('current-date').textContent   = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  document.getElementById('hero-copy').textContent      = overdueInst
+    ? `Tienes ${overdueInst} cuota${overdueInst !== 1 ? 's' : ''} vencida${overdueInst !== 1 ? 's' : ''}. Conviene atender primero la sección de pagos y vencimientos.`
+    : pendInst
+      ? `Hay ${pendInst} cuota${pendInst !== 1 ? 's' : ''} pendientes. Usa esta vista para registrar pagos y seguir los próximos vencimientos.`
+      : 'No hay cuotas pendientes en este momento. Puedes registrar nuevos préstamos o capturar pagos manuales.';
 
+  renderQuickStats();
   renderAlerts();
   renderLenders();
   renderDebtors();
@@ -638,12 +768,16 @@ function renderAlerts() {
 // ── Lenders ───────────────────────────────────────────────
 function renderLenders() {
   const list = document.getElementById('lenders-list');
-  if (!lenders.length) {
-    list.innerHTML = '<div style="text-align:center;color:var(--text3);padding:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">Sin prestamistas. Agrega uno con "+ Prestamista".</div>';
+  let visible = lenders.map(lender => {
+    const lDebts  = debts.filter(d => d.lenderId === lender.id);
+    const matches = loanMatches([lender.name, ...lDebts.map(d => d.name), ...lDebts.map(d => debtors.find(x => x.id === d.debtorId)?.name || '')]);
+    return matches ? { lender, lDebts } : null;
+  }).filter(Boolean);
+  if (!visible.length) {
+    list.innerHTML = `<div style="text-align:center;color:var(--text3);padding:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">${lenders.length ? 'No hay prestamistas que coincidan con la búsqueda.' : 'Sin prestamistas. Agrega uno con "+ Prestamista".'}</div>`;
     return;
   }
-  list.innerHTML = lenders.map(lender => {
-    const lDebts  = debts.filter(d => d.lenderId === lender.id);
+  list.innerHTML = visible.map(({ lender, lDebts }) => {
     const totalL  = lDebts.reduce((s,d) => s + d.total, 0);
     const paidL   = lDebts.reduce((s,d) => s + paidForDebt(d.id), 0);
     const cards   = lDebts.map(d => {
@@ -669,6 +803,7 @@ function renderLenders() {
           <div class="debtor-meta">${lDebts.length} deuda${lDebts.length !== 1 ? 's' : ''} · Prestado: ${fmt(totalL)} · Cobrado: ${fmt(paidL)} · Saldo: ${fmt(totalL - paidL)}</div>
         </div>
         <div class="debtor-actions">
+          <button class="btn sm" onclick="event.stopPropagation();openEditLenderModal(${lender.id})">Editar</button>
           <button class="btn sm danger" onclick="event.stopPropagation();deleteLender(${lender.id})">Eliminar</button>
           <span id="arrow-l${lender.id}" style="color:var(--text3);font-size:18px;transition:transform 0.2s">▾</span>
         </div>
@@ -683,12 +818,16 @@ function renderLenders() {
 // ── Debtors ───────────────────────────────────────────────
 function renderDebtors() {
   const list = document.getElementById('debtors-list');
-  if (!debtors.length) {
-    list.innerHTML = '<div style="text-align:center;color:var(--text3);padding:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">Sin deudores. Agrega uno con "+ Deudor".</div>';
+  let visible = debtors.map(debtor => {
+    const dDebts = debts.filter(d => d.debtorId === debtor.id);
+    const matches = loanMatches([debtor.name, ...dDebts.map(d => d.name), ...dDebts.map(d => lenders.find(l => l.id === d.lenderId)?.name || '')]);
+    return matches ? { debtor, dDebts } : null;
+  }).filter(Boolean);
+  if (!visible.length) {
+    list.innerHTML = `<div style="text-align:center;color:var(--text3);padding:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">${debtors.length ? 'No hay deudores o préstamos que coincidan con la búsqueda.' : 'Sin deudores. Agrega uno con "+ Deudor".'}</div>`;
     return;
   }
-  list.innerHTML = debtors.map(debtor => {
-    const dDebts   = debts.filter(d => d.debtorId === debtor.id);
+  list.innerHTML = visible.map(({ debtor, dDebts }) => {
     const totalD   = dDebts.reduce((s,d) => s + d.total, 0);
     const paidD    = dDebts.reduce((s,d) => s + paidForDebt(d.id), 0);
     const cards    = dDebts.map(d => {
@@ -720,7 +859,8 @@ function renderDebtors() {
           ${over  ? `<span class="pill" style="background:rgba(255,92,92,0.12);color:var(--danger)">${over} vencida${over !== 1 ? 's' : ''}</span>` : ''}
           ${pend && !over ? `<span class="pill" style="background:rgba(255,179,71,0.12);color:var(--warning)">${pend} cuota${pend !== 1 ? 's' : ''} pend.</span>` : ''}
         </div>
-        <div class="dc-actions">
+        <div class="dc-actions tight">
+          <button class="btn sm" onclick="openEditDebtModal(${d.id})">Editar</button>
           <button class="btn sm" onclick="openAddInstallmentModal(${d.id})">+ Cuota</button>
           <button class="btn sm primary" onclick="openPaymentModal(${d.id})">+ Pago</button>
           ${installments.some(i=>i.debtId===d.id) ? `<button class="btn sm danger" onclick="deletePlan(${d.id})">Borrar plan</button>` : ''}
@@ -741,6 +881,7 @@ function renderDebtors() {
         </div>
         <div class="debtor-actions">
           <button class="btn sm" onclick="event.stopPropagation();openAddDebtModal(${debtor.id})">+ Deuda</button>
+          <button class="btn sm" onclick="event.stopPropagation();openEditDebtorModal(${debtor.id})">Editar</button>
           <button class="btn sm danger" onclick="event.stopPropagation();deleteDebtor(${debtor.id})">Eliminar</button>
           <span id="arrow-${debtor.id}" style="color:var(--text3);font-size:18px;transition:transform 0.2s">▾</span>
         </div>
@@ -839,6 +980,7 @@ function renderPlan() {
       <td class="mono">${fmt(inst.amount)}</td>
       <td><span class="badge ${st}">${labels[st]}</span></td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn sm" onclick="openEditInstallmentModal(${inst.id})">Editar</button>
         ${!inst.paid ? `<button class="btn sm primary" onclick="openPaymentModal(${inst.debtId},${inst.id})">Pagar</button>` : ''}
         ${inst.paid ? (() => { const lp = payments.filter(p=>p.installmentId===inst.id).sort((a,b)=>b.id-a.id)[0]; return lp ? `<button class="btn sm" style="font-size:11px;padding:3px 8px" onclick="openEvidenceModal(${lp.id})">📎 Evidencia</button>` : ''; })() : ''}
         <button class="btn sm danger" onclick="deleteInstallment(${inst.id})">✕</button>
@@ -886,6 +1028,7 @@ function renderPaymentsTable() {
         ${evCount ? `<span class="ev-badge" onclick="openEvidenceModal(${p.id})">📎 ${evCount}</span>` : '<span style="color:var(--text3);font-size:12px">—</span>'}
       </td>
       <td style="display:flex;gap:4px">
+        <button class="btn icon" title="Editar pago" onclick="openEditPaymentModal(${p.id})">✎</button>
         <button class="btn icon" title="Agregar evidencia" onclick="openEvidenceModal(${p.id})">📎</button>
         <button class="btn icon danger" onclick="deletePayment(${p.id})">✕</button>
       </td>
@@ -1009,29 +1152,65 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 document.querySelectorAll('.modal-bg').forEach(el => el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); }));
 document.addEventListener('keydown', e => { if (e.key==='Escape') document.querySelectorAll('.modal-bg.open').forEach(m=>m.classList.remove('open')); });
 
+function setModalSubmit(btnId, label) {
+  const btn = document.getElementById(btnId);
+  btn.dataset.label = label;
+  btn.textContent = label;
+}
+
 function openAddLenderModal() {
+  editingLenderId = null;
+  document.getElementById('lender-modal-title').textContent = 'Nuevo prestamista';
+  setModalSubmit('btn-save-lender', 'Agregar');
   document.getElementById('lender-name').value = '';
   document.getElementById('lender-err').classList.remove('visible');
   openModal('modal-lender');
   setTimeout(() => document.getElementById('lender-name').focus(), 100);
 }
 
+function openEditLenderModal(id) {
+  const lender = lenders.find(l => l.id === id);
+  if (!lender) return;
+  editingLenderId = id;
+  document.getElementById('lender-modal-title').textContent = 'Editar prestamista';
+  setModalSubmit('btn-save-lender', 'Actualizar');
+  document.getElementById('lender-name').value = lender.name;
+  document.getElementById('lender-err').classList.remove('visible');
+  openModal('modal-lender');
+}
+
 function openAddDebtorModal() {
+  editingDebtorId = null;
+  document.getElementById('debtor-modal-title').textContent = 'Nuevo deudor';
+  setModalSubmit('btn-save-debtor', 'Agregar');
   document.getElementById('debtor-name').value = '';
   document.getElementById('debtor-err').classList.remove('visible');
   openModal('modal-debtor');
   setTimeout(() => document.getElementById('debtor-name').focus(), 100);
 }
 
-function openAddDebtModal(preDebtorId) {
+function openEditDebtorModal(id) {
+  const debtor = debtors.find(d => d.id === id);
+  if (!debtor) return;
+  editingDebtorId = id;
+  document.getElementById('debtor-modal-title').textContent = 'Editar deudor';
+  setModalSubmit('btn-save-debtor', 'Actualizar');
+  document.getElementById('debtor-name').value = debtor.name;
+  document.getElementById('debtor-err').classList.remove('visible');
+  openModal('modal-debtor');
+}
+
+function resetDebtForm(preDebtorId, debt) {
   if (!debtors.length) { alert('Primero agrega un deudor.'); return; }
   const sel = document.getElementById('debt-debtor');
   sel.innerHTML = debtors.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
-  if (preDebtorId) sel.value = preDebtorId;
+  if (debt) sel.value = debt.debtorId;
+  else if (preDebtorId) sel.value = preDebtorId;
   const lSel = document.getElementById('debt-lender');
   lSel.innerHTML = '<option value="">— Sin prestamista —</option>' + lenders.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
-  document.getElementById('debt-name').value = '';
-  document.getElementById('debt-total').value = '';
+  lSel.value = debt?.lenderId || '';
+  document.getElementById('debt-name').value = debt?.name || '';
+  document.getElementById('debt-total').value = debt?.total || '';
   document.getElementById('debt-total').readOnly = false;
   document.getElementById('debt-total').style.opacity = '1';
   document.getElementById('rubros-list').innerHTML = '';
@@ -1040,11 +1219,35 @@ function openAddDebtModal(preDebtorId) {
   document.getElementById('debt-cats-data').value = '[]';
   document.getElementById('debt-cats-wrap').querySelectorAll('.tag').forEach(t=>t.remove());
   document.getElementById('debt-cats-input').value = '';
+  document.getElementById('debt-color').value = debt?.color || 'yellow';
+  (debt?.categories || []).forEach(cat => addTag(cat));
+  (debt?.rubros || []).forEach(r => addRubroRow(r.name, r.amount));
+  updateRubroTotal();
+}
+
+function openAddDebtModal(preDebtorId) {
+  editingDebtId = null;
+  document.getElementById('debt-modal-title').textContent = 'Nueva deuda';
+  setModalSubmit('btn-save-debt', 'Agregar');
+  resetDebtForm(preDebtorId, null);
+  openModal('modal-debt');
+}
+
+function openEditDebtModal(id) {
+  const debt = debts.find(d => d.id === id);
+  if (!debt) return;
+  editingDebtId = id;
+  document.getElementById('debt-modal-title').textContent = 'Editar deuda';
+  setModalSubmit('btn-save-debt', 'Actualizar');
+  resetDebtForm(null, debt);
   openModal('modal-debt');
 }
 
 function openAddInstallmentModal(preDebtId) {
   if (!debts.length) { alert('Primero agrega una deuda.'); return; }
+  editingInstallmentId = null;
+  document.getElementById('installment-modal-title').textContent = 'Agregar cuotas';
+  setModalSubmit('btn-save-inst', 'Agregar');
   const sel = document.getElementById('inst-debt');
   sel.innerHTML = debts.map(d => { const dr=debtors.find(x=>x.id===d.debtorId); return `<option value="${d.id}">${dr?dr.name+' · ':''}${d.name}</option>`; }).join('');
   if (preDebtId) sel.value = preDebtId;
@@ -1060,6 +1263,30 @@ function openAddInstallmentModal(preDebtId) {
   openModal('modal-installment');
 }
 
+function openEditInstallmentModal(id) {
+  const inst = installments.find(i => i.id === id);
+  if (!inst) return;
+  editingInstallmentId = id;
+  document.getElementById('installment-modal-title').textContent = 'Editar cuota';
+  setModalSubmit('btn-save-inst', 'Actualizar');
+  const sel = document.getElementById('inst-debt');
+  sel.innerHTML = debts.map(d => { const dr=debtors.find(x=>x.id===d.debtorId); return `<option value="${d.id}">${dr?dr.name+' · ':''}${d.name}</option>`; }).join('');
+  sel.value = inst.debtId;
+  updateInstRubro();
+  document.getElementById('inst-rubro').value = inst.rubroIdx ?? '';
+  document.querySelector('input[name="inst-type"][value="single"]').checked = true;
+  document.getElementById('inst-single-fields').style.display = '';
+  document.getElementById('inst-monthly-fields').style.display = 'none';
+  document.getElementById('rl-single').classList.add('selected');
+  document.getElementById('rl-monthly').classList.remove('selected');
+  document.getElementById('inst-date').value = inst.dueDate || todayStr();
+  document.getElementById('inst-amount').value = inst.amount || '';
+  document.getElementById('inst-desc').value = inst.description || '';
+  document.getElementById('inst-start-date').value = inst.dueDate || todayStr();
+  ['inst-monthly-amount','inst-num'].forEach(id2 => document.getElementById(id2).value = '');
+  openModal('modal-installment');
+}
+
 function updateInstRubro() {
   const debtId = parseInt(document.getElementById('inst-debt').value);
   updateDebtRubroSelect('inst-rubro', 'inst-rubro-field', debtId);
@@ -1067,6 +1294,9 @@ function updateInstRubro() {
 
 function openPaymentModal(preDebtId, preInstId) {
   if (!debts.length) { alert('Primero agrega una deuda.'); return; }
+  editingPaymentId = null;
+  document.getElementById('payment-modal-title').textContent = 'Registrar pago';
+  setModalSubmit('btn-save-pay', 'Registrar');
   const sel = document.getElementById('pay-debt');
   sel.innerHTML = debts.map(d => { const dr=debtors.find(x=>x.id===d.debtorId); return `<option value="${d.id}">${dr?dr.name+' · ':''}${d.name}</option>`; }).join('');
   if (preDebtId) sel.value = preDebtId;
@@ -1085,6 +1315,33 @@ function openPaymentModal(preDebtId, preInstId) {
   openModal('modal-payment');
 }
 
+function openEditPaymentModal(id) {
+  const payment = payments.find(p => p.id === id);
+  if (!payment) return;
+  editingPaymentId = id;
+  document.getElementById('payment-modal-title').textContent = 'Editar pago';
+  setModalSubmit('btn-save-pay', 'Actualizar');
+  const sel = document.getElementById('pay-debt');
+  sel.innerHTML = debts.map(d => { const dr=debtors.find(x=>x.id===d.debtorId); return `<option value="${d.id}">${dr?dr.name+' · ':''}${d.name}</option>`; }).join('');
+  sel.value = payment.debtId;
+  clearEvidenceInput();
+  _preInstId = null;
+  document.getElementById('pay-inst-field').style.display = '';
+  updatePayDebt();
+  document.getElementById('pay-rubro').value = payment.rubroIdx ?? '';
+  updatePayInstallments();
+  document.getElementById('pay-inst').value = payment.installmentId || '';
+  document.getElementById('pay-amount').value = payment.amount || '';
+  document.getElementById('pay-date').value = payment.date || todayStr();
+  document.getElementById('pay-other-desc').value = payment.otherDesc || '';
+  document.querySelector(`input[name="pay-type"][value="${payment.type || 'transfer'}"]`).checked = true;
+  document.querySelectorAll('#pay-type-group .radio-opt').forEach(el=>el.classList.remove('selected'));
+  const selected = document.querySelector(`input[name="pay-type"][value="${payment.type || 'transfer'}"]`);
+  selected.closest('.radio-opt').classList.add('selected');
+  document.getElementById('pay-other-field').style.display = payment.type === 'other' ? '' : 'none';
+  openModal('modal-payment');
+}
+
 function updatePayDebt(preInstId) {
   const debtId = parseInt(document.getElementById('pay-debt').value);
   updateDebtRubroSelect('pay-rubro', 'pay-rubro-field', debtId);
@@ -1096,8 +1353,9 @@ function updatePayInstallments(preInstId) {
   const rubroVal = document.getElementById('pay-rubro').value;
   const rubroIdx = rubroVal !== '' ? parseInt(rubroVal) : null;
   const instSel  = document.getElementById('pay-inst');
+  const currentPayment = editingPaymentId ? payments.find(p => p.id === editingPaymentId) : null;
   const pending  = installments
-    .filter(i => i.debtId===debtId && !i.paid && (rubroIdx===null || i.rubroIdx===rubroIdx))
+    .filter(i => i.debtId===debtId && (!i.paid || i.id === currentPayment?.installmentId) && (rubroIdx===null || i.rubroIdx===rubroIdx))
     .sort((a,b) => instSortKey(a).localeCompare(instSortKey(b)));
   instSel.innerHTML = '<option value="">— Sin vincular —</option>' +
     pending.map(i=>`<option value="${i.id}">${fmtDate(i.dueDate)}${i.description?' · '+i.description:''} (${fmt(i.amount)})</option>`).join('');
@@ -1230,25 +1488,29 @@ function withSave(btnId, fn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
   fn().finally(() => {
     _saving = false;
-    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || 'Guardar'; }
   });
 }
 
-async function addDebtor() {
+async function saveDebtor() {
   const name = document.getElementById('debtor-name').value.trim();
   if (!name) return;
   const err = document.getElementById('debtor-err');
-  if (debtors.some(d=>d.name.toLowerCase()===name.toLowerCase())) { err.classList.add('visible'); return; }
+  if (debtors.some(d=>d.id !== editingDebtorId && d.name.toLowerCase()===name.toLowerCase())) { err.classList.add('visible'); return; }
   err.classList.remove('visible');
   try {
-    const d = await api('POST', '/api/debtors', { name });
-    debtors.push(d);
+    const d = editingDebtorId
+      ? await api('PATCH', `/api/debtors/${editingDebtorId}`, { name })
+      : await api('POST', '/api/debtors', { name });
+    if (editingDebtorId) debtors = debtors.map(x => x.id === editingDebtorId ? d : x);
+    else debtors.push(d);
     closeModal('modal-debtor');
+    editingDebtorId = null;
     render();
   } catch(e) { alert('Error: ' + e.message); }
 }
 
-async function addDebt() {
+async function saveDebt() {
   const debtorId   = parseInt(document.getElementById('debt-debtor').value);
   const name       = document.getElementById('debt-name').value.trim();
   const total      = parseFloat(document.getElementById('debt-total').value) || 0;
@@ -1258,18 +1520,37 @@ async function addDebt() {
   const rubros     = getRubros();
   if (!debtorId || !name) return;
   try {
-    const d = await api('POST', '/api/debts', { debtorId, lenderId, name, total, categories, rubros, color });
-    debts.push(d);
+    const payload = { debtorId, lenderId, name, total, categories, rubros, color };
+    const d = editingDebtId
+      ? await api('PATCH', `/api/debts/${editingDebtId}`, payload)
+      : await api('POST', '/api/debts', payload);
+    if (editingDebtId) debts = debts.map(x => x.id === editingDebtId ? d : x);
+    else debts.push(d);
     closeModal('modal-debt');
+    editingDebtId = null;
     render();
   } catch(e) { alert('Error: ' + e.message); }
 }
 
-async function addInstallments() {
+async function saveInstallments() {
   const debtId   = parseInt(document.getElementById('inst-debt').value);
   if (!debtId) return;
   const rubroVal = document.getElementById('inst-rubro').value;
   const rubroIdx = rubroVal !== '' ? parseInt(rubroVal) : null;
+  if (editingInstallmentId) {
+    const dueDate     = document.getElementById('inst-date').value;
+    const amount      = parseFloat(document.getElementById('inst-amount').value) || 0;
+    const description = document.getElementById('inst-desc').value.trim();
+    if (!dueDate || !amount) return;
+    try {
+      const saved = await api('PATCH', `/api/installments/${editingInstallmentId}`, { dueDate, amount, description, rubroIdx });
+      installments = installments.map(i => i.id === editingInstallmentId ? saved : i);
+      editingInstallmentId = null;
+      closeModal('modal-installment');
+      render();
+    } catch(e) { alert('Error: ' + e.message); }
+    return;
+  }
   const type = document.querySelector('input[name="inst-type"]:checked').value;
   const newInsts = [];
   if (type === 'single') {
@@ -1296,11 +1577,12 @@ async function addInstallments() {
       installments.push(saved);
     }
     closeModal('modal-installment');
+    editingInstallmentId = null;
     render();
   } catch(e) { alert('Error: ' + e.message); }
 }
 
-async function addPayment() {
+async function savePayment() {
   const debtId        = parseInt(document.getElementById('pay-debt').value);
   const installmentId = _preInstId || parseInt(document.getElementById('pay-inst').value) || null;
   const amount        = parseFloat(document.getElementById('pay-amount').value) || 0;
@@ -1313,7 +1595,10 @@ async function addPayment() {
   const debtorId      = debt ? debt.debtorId : null;
   if (!debtId || !amount || !date) return;
   try {
-    const payment = await api('POST', '/api/payments', { debtId, debtorId, installmentId, rubroIdx, amount, date, type, otherDesc });
+    const payload = { debtId, debtorId, installmentId, rubroIdx, amount, date, type, otherDesc };
+    const payment = editingPaymentId
+      ? await api('PATCH', `/api/payments/${editingPaymentId}`, payload)
+      : await api('POST', '/api/payments', payload);
     for (const e of pendingEvidence) {
       const fd = new FormData();
       fd.append('file', e.file);
@@ -1321,28 +1606,29 @@ async function addPayment() {
       const r = await fetch('/api/evidence', { method: 'POST', body: fd });
       if (r.ok) payment.evidence.push(await r.json());
     }
-    payments.push(payment);
-    if (installmentId) {
-      const inst = installments.find(i=>i.id===installmentId);
-      if (inst) inst.paid = true;
-    }
+    await loadData();
     _preInstId = null;
+    editingPaymentId = null;
     clearEvidenceInput();
     closeModal('modal-payment');
     render();
   } catch(e) { alert('Error: ' + e.message); }
 }
 
-async function addLender() {
+async function saveLender() {
   const name = document.getElementById('lender-name').value.trim();
   if (!name) return;
   const err = document.getElementById('lender-err');
-  if (lenders.some(l=>l.name.toLowerCase()===name.toLowerCase())) { err.classList.add('visible'); return; }
+  if (lenders.some(l=>l.id !== editingLenderId && l.name.toLowerCase()===name.toLowerCase())) { err.classList.add('visible'); return; }
   err.classList.remove('visible');
   try {
-    const l = await api('POST', '/api/lenders', { name });
-    lenders.push(l);
+    const l = editingLenderId
+      ? await api('PATCH', `/api/lenders/${editingLenderId}`, { name })
+      : await api('POST', '/api/lenders', { name });
+    if (editingLenderId) lenders = lenders.map(x => x.id === editingLenderId ? l : x);
+    else lenders.push(l);
     closeModal('modal-lender');
+    editingLenderId = null;
     render();
   } catch(e) { alert('Error: ' + e.message); }
 }

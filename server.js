@@ -98,6 +98,13 @@ app.post('/api/lenders', async (req, res) => {
     res.json(mapLender(r.rows[0]));
   } catch (e) { res.status(e.code === '23505' ? 409 : 500).json({ error: e.message }); }
 });
+app.patch('/api/lenders/:id', async (req, res) => {
+  try {
+    const r = await pool.query('UPDATE lenders SET name=$1 WHERE id=$2 RETURNING *', [req.body.name, req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(mapLender(r.rows[0]));
+  } catch (e) { res.status(e.code === '23505' ? 409 : 500).json({ error: e.message }); }
+});
 app.delete('/api/lenders/:id', async (req, res) => {
   try { await pool.query('DELETE FROM lenders WHERE id=$1', [req.params.id]); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
@@ -111,6 +118,13 @@ app.get('/api/debtors', async (req, res) => {
 app.post('/api/debtors', async (req, res) => {
   try {
     const r = await pool.query('INSERT INTO debtors(name) VALUES($1) RETURNING *', [req.body.name]);
+    res.json(mapDebtor(r.rows[0]));
+  } catch (e) { res.status(e.code === '23505' ? 409 : 500).json({ error: e.message }); }
+});
+app.patch('/api/debtors/:id', async (req, res) => {
+  try {
+    const r = await pool.query('UPDATE debtors SET name=$1 WHERE id=$2 RETURNING *', [req.body.name, req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(mapDebtor(r.rows[0]));
   } catch (e) { res.status(e.code === '23505' ? 409 : 500).json({ error: e.message }); }
 });
@@ -132,6 +146,21 @@ app.post('/api/debts', async (req, res) => {
       [debtorId, lenderId || null, name, total || 0,
        JSON.stringify(categories || []), JSON.stringify(rubros || []), color || 'yellow']
     );
+    res.json(mapDebt(r.rows[0]));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.patch('/api/debts/:id', async (req, res) => {
+  try {
+    const { debtorId, lenderId, name, total, categories, rubros, color } = req.body;
+    const r = await pool.query(
+      `UPDATE debts
+       SET debtor_id=$1, lender_id=$2, name=$3, total=$4, categories=$5, rubros=$6, color=$7
+       WHERE id=$8
+       RETURNING *`,
+      [debtorId, lenderId || null, name, total || 0,
+       JSON.stringify(categories || []), JSON.stringify(rubros || []), color || 'yellow', req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(mapDebt(r.rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -161,7 +190,18 @@ app.post('/api/installments', async (req, res) => {
 });
 app.patch('/api/installments/:id', async (req, res) => {
   try {
-    const r = await pool.query('UPDATE installments SET paid=$1 WHERE id=$2 RETURNING *', [req.body.paid, req.params.id]);
+    const current = await pool.query('SELECT * FROM installments WHERE id=$1', [req.params.id]);
+    if (!current.rows.length) return res.status(404).json({ error: 'Not found' });
+    const base = current.rows[0];
+    const description = req.body.description !== undefined ? req.body.description : base.description;
+    const dueDate = req.body.dueDate !== undefined ? req.body.dueDate : base.due_date;
+    const amount = req.body.amount !== undefined ? req.body.amount : base.amount;
+    const rubroIdx = req.body.rubroIdx !== undefined ? req.body.rubroIdx : base.rubro_idx;
+    const paid = req.body.paid !== undefined ? req.body.paid : base.paid;
+    const r = await pool.query(
+      'UPDATE installments SET description=$1,due_date=$2,amount=$3,rubro_idx=$4,paid=$5 WHERE id=$6 RETURNING *',
+      [description || null, dueDate, amount || 0, rubroIdx ?? null, paid, req.params.id]
+    );
     res.json(mapInst(r.rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -196,6 +236,45 @@ app.post('/api/payments', async (req, res) => {
        type || 'transfer', otherDesc || null, rubroIdx ?? null]
     );
     res.json(mapPay(r.rows[0], []));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.patch('/api/payments/:id', async (req, res) => {
+  try {
+    const current = await pool.query('SELECT * FROM payments WHERE id=$1', [req.params.id]);
+    if (!current.rows.length) return res.status(404).json({ error: 'Not found' });
+    const base = current.rows[0];
+    const nextInstallmentId = req.body.installmentId !== undefined ? (req.body.installmentId || null) : base.installment_id;
+    const prevInstallmentId = base.installment_id;
+
+    if (prevInstallmentId && prevInstallmentId !== nextInstallmentId) {
+      await pool.query('UPDATE installments SET paid=false WHERE id=$1', [prevInstallmentId]);
+    }
+    if (nextInstallmentId) {
+      await pool.query('UPDATE installments SET paid=true WHERE id=$1', [nextInstallmentId]);
+    }
+
+    const r = await pool.query(
+      `UPDATE payments
+       SET debt_id=$1, debtor_id=$2, installment_id=$3, amount=$4, date=$5, type=$6, other_desc=$7, rubro_idx=$8
+       WHERE id=$9
+       RETURNING *`,
+      [
+        req.body.debtId !== undefined ? req.body.debtId : base.debt_id,
+        req.body.debtorId !== undefined ? req.body.debtorId : base.debtor_id,
+        nextInstallmentId,
+        req.body.amount !== undefined ? req.body.amount : base.amount,
+        req.body.date !== undefined ? req.body.date : base.date,
+        req.body.type !== undefined ? req.body.type : base.type,
+        req.body.otherDesc !== undefined ? (req.body.otherDesc || null) : base.other_desc,
+        req.body.rubroIdx !== undefined ? req.body.rubroIdx : base.rubro_idx,
+        req.params.id,
+      ]
+    );
+    const ev = await pool.query(
+      `SELECT id,name,type,size FROM evidence WHERE payment_id=$1 ORDER BY id`,
+      [req.params.id]
+    );
+    res.json(mapPay(r.rows[0], ev.rows));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/payments/:id', async (req, res) => {
