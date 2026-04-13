@@ -223,6 +223,10 @@
     .ev-item-name { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .ev-item-size { font-size:11px; color:var(--text3); margin-top:2px; }
     .ev-item-actions { display:flex; gap:6px; flex-shrink:0; }
+    .timeline { display:flex; flex-direction:column; gap:8px; }
+    .timeline-item { border:1px solid var(--border); background:var(--surface2); border-radius:10px; padding:10px 12px; }
+    .timeline-item .title { font-size:13px; font-weight:600; }
+    .timeline-item .meta { font-size:11px; color:var(--text3); margin-top:4px; }
 
     /* Responsive */
     @media (max-width:768px) {
@@ -698,6 +702,34 @@
   </div>
 </div>
 
+<div id="modal-dossier" class="modal-bg">
+  <div class="modal" style="max-width:760px">
+    <h2 id="dossier-title">Expediente del préstamo</h2>
+    <div class="field">
+      <label>Agregar documento del préstamo <span class="hint">(contrato, pagaré, identificación, etc.)</span></label>
+      <div class="ev-drop" onclick="document.getElementById('dossier-file').click()">
+        <input type="file" id="dossier-file" onchange="handleDebtDocumentUpload(this.files)" />
+        Haz click para adjuntar un documento al expediente
+      </div>
+    </div>
+    <div class="field">
+      <label>Nota del documento <span class="hint">(opcional)</span></label>
+      <input type="text" id="dossier-note" placeholder="Ej: Contrato firmado, INE del deudor..." />
+    </div>
+    <div class="field">
+      <label>Documentos del préstamo</label>
+      <div class="ev-list" id="dossier-docs"></div>
+    </div>
+    <div class="field">
+      <label>Bitácora de actividad</label>
+      <div class="timeline" id="dossier-activity"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-dossier')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const PAL = {
   yellow: { bar:'#e8f55a', light:'rgba(232,245,90,0.25)', pill:'background:rgba(232,245,90,0.15);color:#e8f55a' },
@@ -725,6 +757,9 @@ let editingDebtId = null;
 let editingInstallmentId = null;
 let editingPaymentId = null;
 let reminderSettings = { daysBefore: 7, channel: 'whatsapp' };
+let debtDocuments = [];
+let debtActivity = [];
+let activeDossierDebtId = null;
 
 async function api(method, path, body) {
   const opts = { method, headers: {} };
@@ -828,6 +863,94 @@ function copyReminderMessage(instId) {
   navigator.clipboard?.writeText(text)
     .then(() => alert('Mensaje de recordatorio copiado al portapapeles.'))
     .catch(() => alert(text));
+}
+
+async function openDebtDossier(debtId) {
+  activeDossierDebtId = debtId;
+  const debt = debts.find(d => d.id === debtId);
+  document.getElementById('dossier-title').textContent = `Expediente: ${debt?.name || 'Préstamo'}`;
+  document.getElementById('dossier-note').value = '';
+  document.getElementById('dossier-file').value = '';
+  openModal('modal-dossier');
+  await refreshDebtDossier();
+}
+
+async function refreshDebtDossier() {
+  if (!activeDossierDebtId) return;
+  [debtDocuments, debtActivity] = await Promise.all([
+    api('GET', `/api/debts/${activeDossierDebtId}/documents`),
+    api('GET', `/api/debts/${activeDossierDebtId}/activity`),
+  ]);
+  renderDebtDocuments();
+  renderDebtActivity();
+}
+
+function renderDebtDocuments() {
+  const wrap = document.getElementById('dossier-docs');
+  if (!debtDocuments.length) {
+    wrap.innerHTML = '<div class="ops-empty">Este préstamo aún no tiene documentos cargados.</div>';
+    return;
+  }
+  wrap.innerHTML = debtDocuments.map(doc => `
+    <div class="ev-item">
+      <div class="ev-icon">${fileIcon(doc.type)}</div>
+      <div class="ev-item-info">
+        <div class="ev-item-name">${doc.name}</div>
+        <div class="ev-item-size">${fmtSize(doc.size)}${doc.note ? ' · ' + doc.note : ''}</div>
+      </div>
+      <div class="ev-item-actions">
+        <button class="btn sm" onclick="downloadDebtDocument(${doc.id},'${doc.name.replace(/'/g,"\\'")}')">⬇</button>
+        <button class="btn sm danger" onclick="deleteDebtDocument(${doc.id})">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderDebtActivity() {
+  const wrap = document.getElementById('dossier-activity');
+  if (!debtActivity.length) {
+    wrap.innerHTML = '<div class="ops-empty">Sin movimientos registrados todavía.</div>';
+    return;
+  }
+  wrap.innerHTML = debtActivity.map(item => `
+    <div class="timeline-item">
+      <div class="title">${item.action}</div>
+      <div>${item.detail || 'Sin detalle adicional.'}</div>
+      <div class="meta">${new Date(item.createdAt).toLocaleString('es-MX')} · ${item.entity}</div>
+    </div>
+  `).join('');
+}
+
+async function handleDebtDocumentUpload(files) {
+  if (!activeDossierDebtId || !files?.length) return;
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('note', document.getElementById('dossier-note').value.trim());
+    const r = await fetch(`/api/debts/${activeDossierDebtId}/documents`, { method:'POST', body: fd });
+    if (!r.ok) {
+      alert('No se pudo subir uno de los documentos.');
+      continue;
+    }
+  }
+  document.getElementById('dossier-note').value = '';
+  document.getElementById('dossier-file').value = '';
+  await refreshDebtDossier();
+}
+
+function downloadDebtDocument(id, name) {
+  const a = document.createElement('a');
+  a.href = `/api/debt-documents/${id}?download=1`;
+  a.download = name;
+  a.click();
+}
+
+async function deleteDebtDocument(id) {
+  try {
+    await api('DELETE', `/api/debt-documents/${id}`);
+    await refreshDebtDossier();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 function setWorkspace(next) {
@@ -1120,6 +1243,7 @@ function renderDebtors() {
         </div>
         <div class="dc-actions tight">
           <button class="btn sm" onclick="openEditDebtModal(${d.id})">Editar</button>
+          <button class="btn sm" onclick="openDebtDossier(${d.id})">Expediente</button>
           <button class="btn sm" onclick="openAddInstallmentModal(${d.id})">+ Cuota</button>
           <button class="btn sm primary" onclick="openPaymentModal(${d.id})">+ Pago</button>
           ${installments.some(i=>i.debtId===d.id) ? `<button class="btn sm danger" onclick="deletePlan(${d.id})">Borrar plan</button>` : ''}

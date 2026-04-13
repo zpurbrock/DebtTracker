@@ -69,6 +69,25 @@ async function initDB() {
       size       INT  NOT NULL,
       data       BYTEA NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS debt_documents (
+      id         SERIAL PRIMARY KEY,
+      debt_id    INT REFERENCES debts(id) ON DELETE CASCADE,
+      name       TEXT NOT NULL,
+      type       TEXT NOT NULL,
+      size       INT NOT NULL,
+      note       TEXT,
+      data       BYTEA NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS activity_log (
+      id         SERIAL PRIMARY KEY,
+      debt_id    INT REFERENCES debts(id) ON DELETE CASCADE,
+      entity     TEXT NOT NULL,
+      entity_id  INT,
+      action     TEXT NOT NULL,
+      detail     TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
 
     ALTER TABLE debts ADD COLUMN IF NOT EXISTS start_date DATE;
     ALTER TABLE debts ADD COLUMN IF NOT EXISTS payment_frequency TEXT DEFAULT 'monthly';
@@ -102,6 +121,22 @@ const mapPay = (r, evidence = []) => ({
   date: r.date ? r.date.toISOString().slice(0, 10) : null,
   type: r.type, otherDesc: r.other_desc, rubroIdx: r.rubro_idx, evidence,
 });
+const mapDebtDoc = r => ({
+  id: r.id, debtId: r.debt_id, name: r.name, type: r.type, size: r.size,
+  note: r.note || '', createdAt: r.created_at ? r.created_at.toISOString() : null,
+});
+const mapActivity = r => ({
+  id: r.id, debtId: r.debt_id, entity: r.entity, entityId: r.entity_id,
+  action: r.action, detail: r.detail || '', createdAt: r.created_at ? r.created_at.toISOString() : null,
+});
+
+async function logActivity(debtId, entity, entityId, action, detail) {
+  if (!debtId) return;
+  await pool.query(
+    'INSERT INTO activity_log(debt_id,entity,entity_id,action,detail) VALUES($1,$2,$3,$4,$5)',
+    [debtId, entity, entityId || null, action, detail || null]
+  );
+}
 
 // ── Lenders ───────────────────────────────────────────────
 app.get('/api/lenders', async (req, res) => {
@@ -164,6 +199,7 @@ app.post('/api/debts', async (req, res) => {
        JSON.stringify(categories || []), JSON.stringify(rubros || []), color || 'yellow',
        startDate || null, paymentFrequency || 'monthly', estimatedPayments || 0, paymentAmount || 0, status || 'active']
     );
+    await logActivity(r.rows[0].id, 'debt', r.rows[0].id, 'created', `Préstamo creado: ${name}`);
     res.json(mapDebt(r.rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -182,11 +218,16 @@ app.patch('/api/debts/:id', async (req, res) => {
        req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'Not found' });
+    await logActivity(r.rows[0].id, 'debt', r.rows[0].id, 'updated', `Préstamo actualizado: ${name}`);
     res.json(mapDebt(r.rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/debts/:id/plan', async (req, res) => {
-  try { await pool.query('DELETE FROM installments WHERE debt_id=$1', [req.params.id]); res.json({ ok: true }); }
+  try {
+    await pool.query('DELETE FROM installments WHERE debt_id=$1', [req.params.id]);
+    await logActivity(req.params.id, 'installment', null, 'deleted', 'Se eliminó el plan de pagos completo');
+    res.json({ ok: true });
+  }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/debts/:id', async (req, res) => {
@@ -206,6 +247,7 @@ app.post('/api/installments', async (req, res) => {
       'INSERT INTO installments(debt_id,description,due_date,amount,rubro_idx,paid) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',
       [debtId, description || null, dueDate, amount || 0, rubroIdx ?? null, paid || false]
     );
+    await logActivity(debtId, 'installment', r.rows[0].id, 'created', `Cuota creada por ${amount || 0} con vencimiento ${dueDate}`);
     res.json(mapInst(r.rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -223,11 +265,17 @@ app.patch('/api/installments/:id', async (req, res) => {
       'UPDATE installments SET description=$1,due_date=$2,amount=$3,rubro_idx=$4,paid=$5 WHERE id=$6 RETURNING *',
       [description || null, dueDate, amount || 0, rubroIdx ?? null, paid, req.params.id]
     );
+    await logActivity(base.debt_id, 'installment', r.rows[0].id, 'updated', `Cuota actualizada a ${amount || 0} con vencimiento ${dueDate}`);
     res.json(mapInst(r.rows[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/installments/:id', async (req, res) => {
-  try { await pool.query('DELETE FROM installments WHERE id=$1', [req.params.id]); res.json({ ok: true }); }
+  try {
+    const inst = await pool.query('SELECT debt_id FROM installments WHERE id=$1', [req.params.id]);
+    await pool.query('DELETE FROM installments WHERE id=$1', [req.params.id]);
+    await logActivity(inst.rows[0]?.debt_id, 'installment', req.params.id, 'deleted', 'Cuota eliminada');
+    res.json({ ok: true });
+  }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -256,6 +304,7 @@ app.post('/api/payments', async (req, res) => {
       [debtId, debtorId || null, installmentId || null, amount || 0, date,
        type || 'transfer', otherDesc || null, rubroIdx ?? null]
     );
+    await logActivity(debtId, 'payment', r.rows[0].id, 'created', `Pago registrado por ${amount || 0} el ${date}`);
     res.json(mapPay(r.rows[0], []));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -295,15 +344,17 @@ app.patch('/api/payments/:id', async (req, res) => {
       `SELECT id,name,type,size FROM evidence WHERE payment_id=$1 ORDER BY id`,
       [req.params.id]
     );
+    await logActivity(r.rows[0].debt_id, 'payment', r.rows[0].id, 'updated', `Pago actualizado por ${r.rows[0].amount} en ${r.rows[0].date}`);
     res.json(mapPay(r.rows[0], ev.rows));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/payments/:id', async (req, res) => {
   try {
-    const p = await pool.query('SELECT installment_id FROM payments WHERE id=$1', [req.params.id]);
+    const p = await pool.query('SELECT installment_id,debt_id FROM payments WHERE id=$1', [req.params.id]);
     await pool.query('DELETE FROM payments WHERE id=$1', [req.params.id]);
     if (p.rows[0]?.installment_id)
       await pool.query('UPDATE installments SET paid=false WHERE id=$1', [p.rows[0].installment_id]);
+    await logActivity(p.rows[0]?.debt_id, 'payment', req.params.id, 'deleted', 'Pago eliminado');
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -319,6 +370,8 @@ app.post('/api/evidence', upload.single('file'), async (req, res) => {
       'INSERT INTO evidence(payment_id,name,type,size,data) VALUES($1,$2,$3,$4,$5) RETURNING id,name,type,size',
       [paymentId, name, file.mimetype, file.size, file.buffer]
     );
+    const p = await pool.query('SELECT debt_id FROM payments WHERE id=$1', [paymentId]);
+    await logActivity(p.rows[0]?.debt_id, 'evidence', r.rows[0].id, 'created', `Evidencia agregada: ${name}`);
     res.json(r.rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -334,8 +387,60 @@ app.get('/api/evidence/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete('/api/evidence/:id', async (req, res) => {
-  try { await pool.query('DELETE FROM evidence WHERE id=$1', [req.params.id]); res.json({ ok: true }); }
+  try {
+    const e = await pool.query('SELECT payment_id,name FROM evidence WHERE id=$1', [req.params.id]);
+    const p = e.rows[0] ? await pool.query('SELECT debt_id FROM payments WHERE id=$1', [e.rows[0].payment_id]) : { rows: [] };
+    await pool.query('DELETE FROM evidence WHERE id=$1', [req.params.id]);
+    await logActivity(p.rows[0]?.debt_id, 'evidence', req.params.id, 'deleted', `Evidencia eliminada: ${e.rows[0]?.name || ''}`);
+    res.json({ ok: true });
+  }
   catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/debts/:id/documents', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT * FROM debt_documents WHERE debt_id=$1 ORDER BY created_at DESC, id DESC', [req.params.id]);
+    res.json(r.rows.map(mapDebtDoc));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/debts/:id/documents', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file' });
+    const name = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    const note = req.body.note || null;
+    const r = await pool.query(
+      'INSERT INTO debt_documents(debt_id,name,type,size,note,data) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',
+      [req.params.id, name, file.mimetype, file.size, note, file.buffer]
+    );
+    await logActivity(req.params.id, 'document', r.rows[0].id, 'created', `Documento agregado: ${name}`);
+    res.json(mapDebtDoc(r.rows[0]));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/debt-documents/:id', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT name,type,data FROM debt_documents WHERE id=$1', [req.params.id]);
+    if (!r.rows.length) return res.status(404).end();
+    const { name, type, data } = r.rows[0];
+    res.set('Content-Type', type);
+    const disp = req.query.download ? 'attachment' : 'inline';
+    res.set('Content-Disposition', `${disp}; filename*=UTF-8''${encodeURIComponent(name)}`);
+    res.send(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/debt-documents/:id', async (req, res) => {
+  try {
+    const d = await pool.query('SELECT debt_id,name FROM debt_documents WHERE id=$1', [req.params.id]);
+    await pool.query('DELETE FROM debt_documents WHERE id=$1', [req.params.id]);
+    await logActivity(d.rows[0]?.debt_id, 'document', req.params.id, 'deleted', `Documento eliminado: ${d.rows[0]?.name || ''}`);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/debts/:id/activity', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT * FROM activity_log WHERE debt_id=$1 ORDER BY created_at DESC, id DESC LIMIT 100', [req.params.id]);
+    res.json(r.rows.map(mapActivity));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
